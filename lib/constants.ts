@@ -3,3 +3,21 @@ export const FULL_DISCLAIMER =
 
 export const SHORT_DISCLAIMER =
   "Coordination tool only. Not a survey, engineering report, legal opinion, or agency approval.";
+
+export const DOCUMENT_TYPE_OPTIONS = [
+  "deed",
+  "easement",
+  "annexation_agreement",
+  "title_commitment",
+  "survey",
+  "plat",
+  "drainage_report",
+  "geohazard_report",
+  "city_comment_letter",
+  "usfs_correspondence",
+  "fire_review",
+  "utility_correspondence",
+  "photo_log",
+  "lidar",
+  "other"
+] as const;

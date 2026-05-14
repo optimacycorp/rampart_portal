@@ -1,67 +1,119 @@
+import Link from "next/link";
+import { uploadProjectDocument } from "@/app/projects/[projectId]/documents/actions";
+import { DocumentUploadForm } from "@/components/DocumentUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 
-const documents = [
-  {
-    title: "Access Exhibit Index",
-    type: "easement",
-    source: "El Paso County",
-    status: "uploaded"
-  },
-  {
-    title: "Drainage Observation Log",
-    type: "drainage_report",
-    source: "Project Team",
-    status: "uploaded"
+const feedbackText: Record<string, string> = {
+  uploaded: "Document uploaded and saved to the project record.",
+  "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
+  "project-not-found": "The requested project could not be found.",
+  "invalid-required-fields": "Title and document type are required.",
+  "file-required": "Please choose a file to upload.",
+  "storage-upload-failed": "The file could not be uploaded to the project-documents bucket.",
+  "document-save-failed": "The document record could not be saved after upload."
+};
+
+export default async function DocumentsPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ status?: string; error?: string }>;
+}) {
+  const { projectId } = await params;
+  const query = await searchParams;
+  const project = await getProjectBySlug(projectId);
+  const documents = await getDocumentsByProjectSlug(projectId);
+  const supabaseConfigured = Boolean(getSupabaseAdminClient());
+
+  if (!project) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Documents"
+          title="Project not found"
+          description="The requested project slug does not exist in the current dataset."
+        />
+      </div>
+    );
   }
-];
 
-export default function DocumentsPage() {
+  const action = uploadProjectDocument.bind(null, projectId);
+
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Documents"
-        title="Project documents"
+        title={`${project.name} documents`}
         description="Upload and organize deeds, easements, surveys, plats, drainage materials, agency correspondence, and supporting evidence files."
       />
       <DisclaimerBanner />
+      {query.status && feedbackText[query.status] ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          {feedbackText[query.status]}
+        </div>
+      ) : null}
+      {query.error && feedbackText[query.error] ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {feedbackText[query.error]}
+        </div>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-          <h2 className="text-xl font-semibold text-ink">Upload form scaffold</h2>
-          <div className="mt-4 grid gap-3">
-            {[
-              "Document type",
-              "Title",
-              "Record date",
-              "Reception number",
-              "Book / page",
-              "Source agency",
-              "Notes",
-              "File upload -> project-documents bucket"
-            ].map((field) => (
-              <div key={field} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {field}
-              </div>
-            ))}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Upload document</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Files are stored in the private <code>project-documents</code> bucket and indexed in the
+                <code className="ml-1">documents</code> table.
+              </p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
+              {supabaseConfigured ? "Live" : "Fallback"}
+            </span>
+          </div>
+          <div className="mt-5">
+            <DocumentUploadForm action={action} />
           </div>
         </div>
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-          <h2 className="text-xl font-semibold text-ink">Current document list</h2>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Current document list</h2>
+              <p className="mt-2 text-sm text-slate-600">Most recent records appear first.</p>
+            </div>
+            <span className="text-sm text-slate-500">{documents.length} documents</span>
+          </div>
           <div className="mt-4 space-y-3">
+            {documents.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+                No project documents have been uploaded yet.
+              </div>
+            ) : null}
             {documents.map((document) => (
-              <div key={document.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <Link
+                key={document.id}
+                href={`/projects/${projectId}/documents/${document.id}`}
+                className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-pine/30 hover:bg-white"
+              >
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="space-y-1">
                     <p className="font-medium text-slate-800">{document.title}</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {document.type} • {document.source}
+                    <p className="text-sm text-slate-500">
+                      {document.document_type} • {document.source_agency ?? "Source pending"}
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                      {document.record_date ?? "No record date"} • {document.file_path ? "File attached" : "Metadata only"}
                     </p>
                   </div>
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
                     {document.status}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

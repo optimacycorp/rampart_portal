@@ -42,3 +42,38 @@ export type FieldPoint = {
   confidence: string;
   description?: string;
 };
+
+export type DocumentType =
+  | "deed"
+  | "easement"
+  | "annexation_agreement"
+  | "title_commitment"
+  | "survey"
+  | "plat"
+  | "drainage_report"
+  | "geohazard_report"
+  | "city_comment_letter"
+  | "usfs_correspondence"
+  | "fire_review"
+  | "utility_correspondence"
+  | "photo_log"
+  | "lidar"
+  | "other";
+
+export type ProjectDocument = {
+  id: string;
+  project_id: string;
+  title: string;
+  document_type: DocumentType;
+  record_date: string | null;
+  reception_number: string | null;
+  book: string | null;
+  page: string | null;
+  source_agency: string | null;
+  file_path: string | null;
+  external_url: string | null;
+  notes: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
