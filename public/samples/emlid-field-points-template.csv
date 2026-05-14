@@ -1,0 +1,4 @@
+point_name,point_type,easting,northing,elevation,latitude,longitude,description,source_equipment,collection_method,confidence
+CEN1,monument,3171382.152,1381355.997,6992.865,38.92176425,-104.61773785,POB/NW corner,EMLID RS4,RTK FIX,rtk_observed
+DW_FOUND_CAP,monument,3171950.996,1381143.475,6938.907,38.92176425,-104.61773785,Found cap likely property corner,EMLID RS4,RTK FIX,rtk_observed
+ANC_REBAR,monument,3171966.615,1381126.486,6935.027,38.92176425,-104.61773785,1/2 inch pipe/rebar near found cap,EMLID RS4,RTK FIX,rtk_observed

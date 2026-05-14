@@ -1,0 +1,88 @@
+import { FieldPoint, Project, ReviewerComment } from "@/lib/types";
+
+export const seededProject: Project = {
+  id: "4d00e17d-0bcf-4840-83a7-9d24f8079f11",
+  name: "3245 Rampart Range Road",
+  slug: "3245-rampart-range-road",
+  description:
+    "Rampart Range development, access, drainage, easement, and planning evidence portal.",
+  parcel_number: "7333200002",
+  address: "3245 Rampart Range Road, Colorado Springs, CO",
+  county: "El Paso County",
+  state: "Colorado"
+};
+
+export const seededReviewerComments: ReviewerComment[] = [
+  {
+    id: "c1",
+    application_number: "SUBD-24-0106",
+    comment_id: "PLN-01",
+    reviewer_name: "Planning Staff",
+    department: "Planning",
+    priority: "high",
+    status: "open",
+    responsible_party: "Thomas",
+    comment_text: "Clarify the document trail supporting private access assumptions.",
+    response_text: "Collecting deed and easement support into the portal.",
+    linked_document_title: "Access Exhibit Index"
+  },
+  {
+    id: "c2",
+    application_number: "DEPN-25-0102",
+    comment_id: "SWENT-04",
+    reviewer_name: "Stormwater Reviewer",
+    department: "City Engineering - SWENT",
+    priority: "critical",
+    status: "waiting_on_engineer",
+    responsible_party: "Dave Gorman / MVE",
+    comment_text: "Identify culvert assumptions and supporting field evidence for drainage routing."
+  },
+  {
+    id: "c3",
+    application_number: "STM-MP24-0278",
+    comment_id: "FIRE-02",
+    reviewer_name: "Fire Reviewer",
+    department: "Fire",
+    priority: "medium",
+    status: "in_progress",
+    responsible_party: "Fire",
+    comment_text: "Provide access observations relevant to seasonal or gate-related constraints."
+  }
+];
+
+export const seededFieldPoints: FieldPoint[] = [
+  {
+    id: "fp-1",
+    point_name: "CEN1",
+    point_type: "monument",
+    easting: 3171382.152,
+    northing: 1381355.997,
+    elevation: 6992.865,
+    latitude: 38.92176425,
+    longitude: -104.61773785,
+    confidence: "rtk_observed",
+    description: "POB/NW corner"
+  },
+  {
+    id: "fp-2",
+    point_name: "DW_FOUND_CAP",
+    point_type: "monument",
+    easting: 3171950.996,
+    northing: 1381143.475,
+    elevation: 6938.907,
+    latitude: 38.92176425,
+    longitude: -104.61773785,
+    confidence: "rtk_observed",
+    description: "Found cap likely property corner"
+  },
+  {
+    id: "fp-3",
+    point_name: "CULV-IN-01",
+    point_type: "culvert_inlet",
+    elevation: 6942.1,
+    latitude: 38.9221,
+    longitude: -104.6184,
+    confidence: "field_observed",
+    description: "Observed inlet on uphill road edge"
+  }
+];
