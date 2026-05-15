@@ -8,12 +8,14 @@ import { getSupabaseAdminClient } from "@/lib/supabase";
 
 const feedbackText: Record<string, string> = {
   uploaded: "Document uploaded and saved to the project record.",
+  "version-uploaded": "New document version uploaded and prior version preserved.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
   "invalid-required-fields": "Title and document type are required.",
   "file-required": "Please choose a file to upload.",
   "storage-upload-failed": "The file could not be uploaded to the project-documents bucket.",
-  "document-save-failed": "The document record could not be saved after upload."
+  "document-save-failed": "The document record could not be saved after upload.",
+  "document-version-save-failed": "The document version history could not be updated."
 };
 
 export default async function DocumentsPage({
@@ -106,7 +108,7 @@ export default async function DocumentsPage({
                       {document.document_type} • {document.source_agency ?? "Source pending"}
                     </p>
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {document.record_date ?? "No record date"} • {document.file_path ? "File attached" : "Metadata only"}
+                      {document.record_date ?? "No record date"} • {document.file_path ? "File attached" : "Metadata only"} • v{document.current_version_number}
                     </p>
                   </div>
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">

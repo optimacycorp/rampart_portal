@@ -1,27 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDocumentById } from "@/lib/documents";
+import { getDocumentById, getDocumentVersionById } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   const { documentId } = await params;
   const supabase = getSupabaseAdminClient();
+  const versionId = request.nextUrl.searchParams.get("versionId");
 
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 500 });
   }
 
-  const document = await getDocumentById(documentId);
+  const [document, version] = await Promise.all([
+    getDocumentById(documentId),
+    versionId ? getDocumentVersionById(versionId) : Promise.resolve(null)
+  ]);
 
-  if (!document?.file_path) {
+  const filePath = version?.file_path ?? document?.file_path;
+
+  if (!filePath) {
     return NextResponse.json({ error: "Document file not found." }, { status: 404 });
   }
 
   const { data, error } = await supabase.storage
     .from("project-documents")
-    .createSignedUrl(document.file_path, 60 * 10, {
+    .createSignedUrl(filePath, 60 * 10, {
       download: true
     });
 

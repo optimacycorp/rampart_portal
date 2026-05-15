@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
-import { getProjectBySlug } from "@/lib/documents";
+import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
@@ -58,26 +58,132 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
   const notes = `${formData.get("notes") ?? ""}`.trim();
   const externalUrl = `${formData.get("external_url") ?? ""}`.trim();
 
-  const { error: insertError } = await supabase.from("documents").insert({
-    project_id: project.id,
-    title,
-    document_type: documentType,
-    record_date: recordDateValue || null,
-    reception_number: receptionNumber || null,
-    book: book || null,
-    page: page || null,
-    source_agency: sourceAgency || null,
-    notes: notes || null,
-    external_url: externalUrl || null,
-    file_path: storagePath,
-    status: "uploaded"
-  });
+  const { data: documentInsert, error: insertError } = await supabase
+    .from("documents")
+    .insert({
+      project_id: project.id,
+      title,
+      document_type: documentType,
+      record_date: recordDateValue || null,
+      reception_number: receptionNumber || null,
+      book: book || null,
+      page: page || null,
+      source_agency: sourceAgency || null,
+      notes: notes || null,
+      external_url: externalUrl || null,
+      file_path: storagePath,
+      status: "uploaded",
+      current_version_number: 1
+    })
+    .select("id")
+    .single();
 
-  if (insertError) {
+  if (insertError || !documentInsert) {
     await supabase.storage.from("project-documents").remove([storagePath]);
     redirect(`/projects/${projectSlug}/documents?error=document-save-failed`);
   }
 
+  const { error: versionInsertError } = await supabase.from("document_versions").insert({
+    document_id: documentInsert.id,
+    version_number: 1,
+    file_path: storagePath,
+    notes: notes || null,
+    is_current: true
+  });
+
+  if (versionInsertError) {
+    await supabase.from("documents").delete().eq("id", documentInsert.id);
+    await supabase.storage.from("project-documents").remove([storagePath]);
+    redirect(`/projects/${projectSlug}/documents?error=document-version-save-failed`);
+  }
+
   revalidatePath(`/projects/${projectSlug}/documents`);
   redirect(`/projects/${projectSlug}/documents?status=uploaded`);
+}
+
+export async function uploadDocumentVersion(projectSlug: string, documentId: string, formData: FormData) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=supabase-not-configured`);
+  }
+
+  const [project, document, existingVersions] = await Promise.all([
+    getProjectBySlug(projectSlug),
+    getDocumentById(documentId),
+    getDocumentVersions(documentId)
+  ]);
+
+  if (!project || !document) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-not-found`);
+  }
+
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=file-required`);
+  }
+
+  const versionNotes = `${formData.get("version_notes") ?? ""}`.trim();
+  const now = Date.now();
+  const nextVersionNumber = Math.max(...existingVersions.map((version) => version.version_number), 0) + 1;
+  const storagePath = `${project.slug}/${documentId}/v${nextVersionNumber}-${now}-${sanitizeFileName(file.name)}`;
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error: uploadError } = await supabase.storage
+    .from("project-documents")
+    .upload(storagePath, arrayBuffer, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false
+    });
+
+  if (uploadError) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=storage-upload-failed`);
+  }
+
+  if (existingVersions.length > 0) {
+    const { error: clearCurrentError } = await supabase
+      .from("document_versions")
+      .update({
+        is_current: false,
+        superseded_at: new Date().toISOString()
+      })
+      .eq("document_id", documentId)
+      .eq("is_current", true);
+
+    if (clearCurrentError) {
+      await supabase.storage.from("project-documents").remove([storagePath]);
+      redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-version-save-failed`);
+    }
+  }
+
+  const { error: versionInsertError } = await supabase.from("document_versions").insert({
+    document_id: documentId,
+    version_number: nextVersionNumber,
+    file_path: storagePath,
+    notes: versionNotes || null,
+    is_current: true
+  });
+
+  if (versionInsertError) {
+    await supabase.storage.from("project-documents").remove([storagePath]);
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-version-save-failed`);
+  }
+
+  const { error: documentUpdateError } = await supabase
+    .from("documents")
+    .update({
+      file_path: storagePath,
+      current_version_number: nextVersionNumber,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", documentId);
+
+  if (documentUpdateError) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-save-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/documents`);
+  revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+  redirect(`/projects/${projectSlug}/documents/${documentId}?status=version-uploaded`);
 }
