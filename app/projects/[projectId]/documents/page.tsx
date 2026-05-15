@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { uploadProjectDocument } from "@/app/projects/[projectId]/documents/actions";
+import { deleteProjectDocument, uploadProjectDocument } from "@/app/projects/[projectId]/documents/actions";
+import { canManageUploads } from "@/lib/auth-server";
+import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentUploadForm } from "@/components/DocumentUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,7 +17,11 @@ const feedbackText: Record<string, string> = {
   "file-required": "Please choose a file to upload.",
   "storage-upload-failed": "The file could not be uploaded to the project-documents bucket.",
   "document-save-failed": "The document record could not be saved after upload.",
-  "document-version-save-failed": "The document version history could not be updated."
+  "document-version-save-failed": "The document version history could not be updated.",
+  deleted: "Document upload deleted.",
+  forbidden: "Only owner or audit roles can delete uploaded records.",
+  "document-delete-failed": "The document could not be deleted.",
+  "document-not-found": "The requested document could not be found."
 };
 
 export default async function DocumentsPage({
@@ -27,8 +33,11 @@ export default async function DocumentsPage({
 }) {
   const { projectId } = await params;
   const query = await searchParams;
-  const project = await getProjectBySlug(projectId);
-  const documents = await getDocumentsByProjectSlug(projectId);
+  const [project, documents, canDelete] = await Promise.all([
+    getProjectBySlug(projectId),
+    getDocumentsByProjectSlug(projectId),
+    canManageUploads()
+  ]);
   const supabaseConfigured = Boolean(getSupabaseAdminClient());
 
   if (!project) {
@@ -96,13 +105,9 @@ export default async function DocumentsPage({
               </div>
             ) : null}
             {documents.map((document) => (
-              <Link
-                key={document.id}
-                href={`/projects/${projectId}/documents/${document.id}`}
-                className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-pine/30 hover:bg-white"
-              >
+              <div key={document.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
+                  <Link href={`/projects/${projectId}/documents/${document.id}`} className="block flex-1 space-y-1">
                     <p className="font-medium text-slate-800">{document.title}</p>
                     <p className="text-sm text-slate-500">
                       {document.document_type} • {document.source_agency ?? "Source pending"}
@@ -110,12 +115,19 @@ export default async function DocumentsPage({
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
                       {document.record_date ?? "No record date"} • {document.file_path ? "File attached" : "Metadata only"} • v{document.current_version_number}
                     </p>
+                  </Link>
+                  <div className="flex items-center gap-3">
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                      {document.status}
+                    </span>
+                    {canDelete ? (
+                      <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
+                        <DeleteButton label="Delete" />
+                      </form>
+                    ) : null}
                   </div>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                    {document.status}
-                  </span>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>

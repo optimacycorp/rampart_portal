@@ -94,7 +94,8 @@ export const seededFieldPoints: FieldPoint[] = [
     latitude: 38.92176425,
     longitude: -104.61773785,
     confidence: "rtk_observed",
-    description: "POB/NW corner"
+    description: "POB/NW corner",
+    collected_at: "2026-02-08T13:27:12-06:00"
   },
   {
     id: "fp-2",
@@ -106,7 +107,8 @@ export const seededFieldPoints: FieldPoint[] = [
     latitude: 38.92176425,
     longitude: -104.61773785,
     confidence: "rtk_observed",
-    description: "Found cap likely property corner"
+    description: "Found cap likely property corner",
+    collected_at: "2026-02-08T13:27:53-06:00"
   },
   {
     id: "fp-3",
@@ -116,6 +118,7 @@ export const seededFieldPoints: FieldPoint[] = [
     latitude: 38.9221,
     longitude: -104.6184,
     confidence: "field_observed",
-    description: "Observed inlet on uphill road edge"
+    description: "Observed inlet on uphill road edge",
+    collected_at: "2026-02-08T13:29:00-06:00"
   }
 ];

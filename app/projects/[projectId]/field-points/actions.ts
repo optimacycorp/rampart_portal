@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireUploadManagementRole } from "@/lib/auth-server";
 import { getProjectBySlug } from "@/lib/documents";
 import { validateFieldPointImportRow } from "@/lib/field-point-import";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -50,6 +51,7 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
       description: row.description ?? null,
       source_equipment: row.source_equipment ?? null,
       collection_method: row.collection_method ?? null,
+      collected_at: row.collected_at || null,
       confidence: row.confidence || "field_observed"
     }));
 
@@ -66,4 +68,28 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
   revalidatePath(`/projects/${projectSlug}/field-points`);
   revalidatePath(`/projects/${projectSlug}/field-points/import`);
   redirect(`/projects/${projectSlug}/field-points?status=imported`);
+}
+
+export async function deleteFieldPoint(projectSlug: string, fieldPointId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/field-points?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireUploadManagementRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/field-points?error=forbidden`);
+  }
+
+  const { error } = await supabase.from("field_points").delete().eq("id", fieldPointId);
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/field-points?error=delete-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/field-points`);
+  revalidatePath(`/projects/${projectSlug}/map`);
+  redirect(`/projects/${projectSlug}/field-points?status=deleted`);
 }

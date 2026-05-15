@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireUploadManagementRole } from "@/lib/auth-server";
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -186,4 +187,40 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
   revalidatePath(`/projects/${projectSlug}/documents`);
   revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
   redirect(`/projects/${projectSlug}/documents/${documentId}?status=version-uploaded`);
+}
+
+export async function deleteProjectDocument(projectSlug: string, documentId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/documents?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireUploadManagementRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/documents?error=forbidden`);
+  }
+
+  const [document, versions] = await Promise.all([getDocumentById(documentId), getDocumentVersions(documentId)]);
+
+  if (!document) {
+    redirect(`/projects/${projectSlug}/documents?error=document-not-found`);
+  }
+
+  const filePaths = versions.map((version) => version.file_path).filter(Boolean);
+
+  if (filePaths.length > 0) {
+    await supabase.storage.from("project-documents").remove(filePaths);
+  }
+
+  const { error } = await supabase.from("documents").delete().eq("id", documentId);
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/documents?error=document-delete-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/documents`);
+  revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+  redirect(`/projects/${projectSlug}/documents?status=deleted`);
 }

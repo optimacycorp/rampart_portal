@@ -39,6 +39,7 @@ export const FIELD_POINT_IMPORT_FIELDS = [
   "description",
   "source_equipment",
   "collection_method",
+  "collected_at",
   "confidence"
 ] as const;
 
@@ -54,6 +55,7 @@ export const FIELD_POINT_IMPORT_ALIASES: Record<(typeof FIELD_POINT_IMPORT_FIELD
   description: ["description", "desc", "notes", "code description"],
   source_equipment: ["source_equipment", "device type", "equipment"],
   collection_method: ["collection_method", "correction type", "method", "solution status"],
+  collected_at: ["collected_at", "averaging start", "date collected", "observation date", "date"],
   confidence: ["confidence", "solution status", "quality"]
 };
 

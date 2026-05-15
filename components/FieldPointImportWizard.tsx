@@ -103,6 +103,7 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
         description: row[columnMap.description ?? ""]?.trim() ?? "",
         source_equipment: row[columnMap.source_equipment ?? ""]?.trim() ?? "",
         collection_method: row[columnMap.collection_method ?? ""]?.trim() ?? "",
+        collected_at: row[columnMap.collected_at ?? ""]?.trim() ?? "",
         confidence: inferConfidence(
           row[columnMap.confidence ?? ""]?.trim() ?? "",
           row[columnMap.collection_method ?? ""]?.trim() ?? ""

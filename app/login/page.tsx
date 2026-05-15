@@ -4,14 +4,16 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { setDemoAuth } from "@/components/AuthGate";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { DEMO_ROLE_OPTIONS } from "@/lib/auth-constants";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("team@rampart-range.org");
+  const [role, setRole] = useState("owner");
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setDemoAuth(true);
+    setDemoAuth(true, role);
     router.push("/");
     router.refresh();
   }
@@ -35,6 +37,20 @@ export default function LoginPage() {
               placeholder="team@rampart-range.org"
               type="email"
             />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Role</span>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-pine"
+            >
+              {DEMO_ROLE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="submit"

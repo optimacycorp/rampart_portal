@@ -51,6 +51,7 @@ export type FieldPoint = {
   confidence: string;
   description?: string;
   photo_document_id?: string | null;
+  collected_at?: string | null;
   created_at?: string;
 };
 
@@ -67,6 +68,7 @@ export type FieldPointImportRow = {
   source_equipment?: string;
   collection_method?: string;
   confidence: string;
+  collected_at?: string;
   validationIssues: string[];
 };
 

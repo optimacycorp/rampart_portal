@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { uploadDocumentVersion } from "@/app/projects/[projectId]/documents/actions";
+import { deleteProjectDocument, uploadDocumentVersion } from "@/app/projects/[projectId]/documents/actions";
+import { canManageUploads } from "@/lib/auth-server";
+import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentVersionUploadForm } from "@/components/DocumentVersionUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
@@ -14,7 +16,11 @@ export default async function DocumentDetailPage({
 }) {
   const { projectId, documentId } = await params;
   const query = await searchParams;
-  const [document, versions] = await Promise.all([getDocumentById(documentId), getDocumentVersions(documentId)]);
+  const [document, versions, canDelete] = await Promise.all([
+    getDocumentById(documentId),
+    getDocumentVersions(documentId),
+    canManageUploads()
+  ]);
 
   if (!document) {
     return (
@@ -51,7 +57,9 @@ export default async function DocumentDetailPage({
               ? "The version history could not be updated."
               : query.error === "file-required"
                 ? "Please choose a replacement file."
-                : "The requested document action could not be completed."}
+                : query.error === "forbidden"
+                  ? "Only owner or audit roles can delete uploaded records."
+                  : "The requested document action could not be completed."}
         </div>
       ) : null}
       <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
@@ -84,6 +92,11 @@ export default async function DocumentDetailPage({
                   Open current file
                 </Link>
               ) : null}
+              {canDelete ? (
+                <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
+                  <DeleteButton label="Delete document" />
+                </form>
+              ) : null}
               {document.external_url ? (
                 <a
                   href={document.external_url}
@@ -112,18 +125,12 @@ export default async function DocumentDetailPage({
                   <div
                     key={version.id}
                     className={`rounded-2xl border px-4 py-4 ${
-                      version.is_current
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-slate-200 bg-white/70 text-slate-500"
+                      version.is_current ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white/70 text-slate-500"
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p
-                          className={`font-semibold ${
-                            version.is_current ? "text-emerald-900" : "text-slate-500 line-through"
-                          }`}
-                        >
+                        <p className={`font-semibold ${version.is_current ? "text-emerald-900" : "text-slate-500 line-through"}`}>
                           Version {version.version_number}
                         </p>
                         <p className="mt-1 text-sm">
@@ -137,9 +144,7 @@ export default async function DocumentDetailPage({
                       <div className="flex items-center gap-3">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
-                            version.is_current
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-200 text-slate-600"
+                            version.is_current ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
                           }`}
                         >
                           {version.is_current ? "Current" : "Superseded"}
