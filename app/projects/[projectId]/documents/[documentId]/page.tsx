@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { deleteProjectDocument, uploadDocumentVersion } from "@/app/projects/[projectId]/documents/actions";
-import { canManageUploads } from "@/lib/auth-server";
 import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentVersionUploadForm } from "@/components/DocumentVersionUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { getDocumentById, getDocumentVersions } from "@/lib/documents";
 
 export default async function DocumentDetailPage({
@@ -16,10 +16,10 @@ export default async function DocumentDetailPage({
 }) {
   const { projectId, documentId } = await params;
   const query = await searchParams;
-  const [document, versions, canDelete] = await Promise.all([
+  const [{ user, role }, document, versions] = await Promise.all([
+    getCurrentUserContext(),
     getDocumentById(documentId),
-    getDocumentVersions(documentId),
-    canManageUploads()
+    getDocumentVersions(documentId)
   ]);
 
   if (!document) {
@@ -34,6 +34,7 @@ export default async function DocumentDetailPage({
     );
   }
 
+  const canDelete = role === "audit" || (Boolean(user) && document.created_by_user_id === user?.id);
   const versionAction = uploadDocumentVersion.bind(null, projectId, documentId);
 
   return (
@@ -58,7 +59,7 @@ export default async function DocumentDetailPage({
               : query.error === "file-required"
                 ? "Please choose a replacement file."
                 : query.error === "forbidden"
-                  ? "Only owner or audit roles can delete uploaded records."
+                  ? "Only the uploader or an audit user can delete uploaded records."
                   : "The requested document action could not be completed."}
         </div>
       ) : null}
@@ -71,7 +72,8 @@ export default async function DocumentDetailPage({
             `Book / page: ${document.book ?? "pending"} / ${document.page ?? "pending"}`,
             `Source agency: ${document.source_agency ?? "pending"}`,
             `Status: ${document.status}`,
-            `Current version: v${document.current_version_number}`
+            `Current version: v${document.current_version_number}`,
+            `Uploaded by: ${document.created_by_email ?? "Unknown"}`
           ].map((item) => (
             <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {item}
@@ -82,6 +84,10 @@ export default async function DocumentDetailPage({
           <div className="space-y-4">
             <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
               {document.notes ?? "No document notes yet."}
+            </div>
+            <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              Created {new Date(document.created_at).toLocaleString()}
+              {document.updated_at ? ` • Updated ${new Date(document.updated_at).toLocaleString()}` : ""}
             </div>
             <div className="flex flex-wrap gap-3">
               {document.file_path ? (
@@ -137,8 +143,10 @@ export default async function DocumentDetailPage({
                           {version.notes ?? (version.is_current ? "Current live file." : "Superseded revision.")}
                         </p>
                         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                          Uploaded {new Date(version.created_at).toLocaleDateString()}
-                          {version.superseded_at ? ` • Superseded ${new Date(version.superseded_at).toLocaleDateString()}` : ""}
+                          Uploaded {new Date(version.created_at).toLocaleDateString()} by {version.uploaded_by_email ?? "Unknown"}
+                          {version.superseded_at
+                            ? ` • Superseded ${new Date(version.superseded_at).toLocaleDateString()}`
+                            : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

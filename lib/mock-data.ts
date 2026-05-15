@@ -86,6 +86,9 @@ export const seededResponsibleParties = [
 export const seededFieldPoints: FieldPoint[] = [
   {
     id: "fp-1",
+    uploaded_by_user_id: "demo-owner",
+    uploaded_by_email: "team@rampart-range.org",
+    import_source_file: "emlid-field-points-template.csv",
     point_name: "CEN1",
     point_type: "monument",
     easting: 3171382.152,
@@ -99,6 +102,9 @@ export const seededFieldPoints: FieldPoint[] = [
   },
   {
     id: "fp-2",
+    uploaded_by_user_id: "demo-owner",
+    uploaded_by_email: "team@rampart-range.org",
+    import_source_file: "emlid-field-points-template.csv",
     point_name: "DW_FOUND_CAP",
     point_type: "monument",
     easting: 3171950.996,
@@ -112,6 +118,9 @@ export const seededFieldPoints: FieldPoint[] = [
   },
   {
     id: "fp-3",
+    uploaded_by_user_id: "demo-owner",
+    uploaded_by_email: "team@rampart-range.org",
+    import_source_file: "emlid-field-points-template.csv",
     point_name: "CULV-IN-01",
     point_type: "culvert_inlet",
     elevation: 6942.1,

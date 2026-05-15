@@ -24,7 +24,7 @@ export async function getFieldPointsByProjectSlug(projectSlug: string): Promise<
   const { data, error } = await supabase
     .from("field_points")
     .select(
-      "id, project_id, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
+      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -34,5 +34,27 @@ export async function getFieldPointsByProjectSlug(projectSlug: string): Promise<
   }
 
   return data as FieldPoint[];
+}
+
+export async function getFieldPointById(fieldPointId: string): Promise<FieldPoint | null> {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return seededFieldPoints.find((point) => point.id === fieldPointId) ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from("field_points")
+    .select(
+      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
+    )
+    .eq("id", fieldPointId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as FieldPoint;
 }
 export { FIELD_POINT_CONFIDENCE_OPTIONS, FIELD_POINT_IMPORT_FIELDS, FIELD_POINT_TYPE_OPTIONS, validateFieldPointImportRow };

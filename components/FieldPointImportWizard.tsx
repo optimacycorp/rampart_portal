@@ -130,7 +130,6 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
     setHeaders(parsed.headers);
     setRows(parsed.rows);
     setFileName(file.name);
-
     setColumnMap(inferFieldMapping(parsed.headers));
   }
 
@@ -190,7 +189,9 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
             <br />
             Allowed confidence values: {FIELD_POINT_CONFIDENCE_OPTIONS.join(", ")}
             <br />
-            Emlid exports with headers like <code>Name</code>, <code>Code</code>, <code>Easting</code>, <code>Northing</code>, <code>CS name</code>, and <code>Solution status</code> are auto-mapped.
+            Emlid exports with headers like <code>Name</code>, <code>Code</code>, <code>Easting</code>,
+            <code className="mx-1">Northing</code>, <code>CS name</code>, and <code>Solution status</code> are
+            auto-mapped.
           </div>
         </div>
       ) : null}
@@ -206,6 +207,7 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
             </div>
             <form action={action}>
               <input type="hidden" name="rows_json" value={JSON.stringify(previewRows)} readOnly />
+              <input type="hidden" name="source_file_name" value={fileName} readOnly />
               <button
                 type="submit"
                 className="rounded-full bg-pine px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
@@ -224,32 +226,39 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
               <span>Validation</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {previewRows.map((row, index) => (
-                <div key={`${row.point_name}-${index}`} className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1.4fr] gap-4 px-4 py-4 text-sm">
-                  <span className="text-slate-700">{row.point_name || "Missing"}</span>
-                  <span className="text-slate-700">{row.point_type || "Missing"}</span>
-                  <span className="text-slate-600">
-                    {row.easting ?? "—"} / {row.northing ?? "—"}
-                  </span>
-                  <span className="text-slate-600">
-                    {row.latitude ?? "—"} / {row.longitude ?? "—"}
-                  </span>
-                  <span className="text-slate-600">{row.confidence}</span>
-                  <div className="text-sm">
-                    {row.validationIssues.length === 0 ? (
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                        Valid
-                      </span>
-                    ) : (
-                      <div className="space-y-1 text-rose-700">
-                        {row.validationIssues.map((issue) => (
-                          <div key={issue}>{issue}</div>
-                        ))}
-                      </div>
-                    )}
+              {previewRows.map((row, index) => {
+                const missingValue = "—";
+
+                return (
+                  <div
+                    key={`${row.point_name}-${index}`}
+                    className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1.4fr] gap-4 px-4 py-4 text-sm"
+                  >
+                    <span className="text-slate-700">{row.point_name || "Missing"}</span>
+                    <span className="text-slate-700">{row.point_type || "Missing"}</span>
+                    <span className="text-slate-600">
+                      {row.easting ?? missingValue} / {row.northing ?? missingValue}
+                    </span>
+                    <span className="text-slate-600">
+                      {row.latitude ?? missingValue} / {row.longitude ?? missingValue}
+                    </span>
+                    <span className="text-slate-600">{row.confidence}</span>
+                    <div className="text-sm">
+                      {row.validationIssues.length === 0 ? (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                          Valid
+                        </span>
+                      ) : (
+                        <div className="space-y-1 text-rose-700">
+                          {row.validationIssues.map((issue) => (
+                            <div key={issue}>{issue}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

@@ -3,13 +3,17 @@ import "@/app/globals.css";
 import { AppShell } from "@/components/AppShell";
 import { PortalFooter } from "@/components/PortalFooter";
 import { PortalNav } from "@/components/PortalNav";
+import { UserMenu } from "@/components/UserMenu";
+import { getCurrentUserContext } from "@/lib/auth-server";
 
 export const metadata: Metadata = {
   title: "Rampart Range Project Evidence Portal",
   description: "Internal coordination and evidence management portal for rampart-range.org."
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { user, profile, role } = await getCurrentUserContext();
+
   return (
     <html lang="en">
       <body>
@@ -31,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </p>
                   </div>
                 </div>
+                {user ? <UserMenu email={user.email ?? "Unknown user"} role={role} fullName={profile?.full_name} /> : null}
               </div>
               <PortalNav />
             </div>

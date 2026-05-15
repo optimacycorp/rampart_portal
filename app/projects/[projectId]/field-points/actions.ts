@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUploadManagementRole } from "@/lib/auth-server";
+import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
 import { getProjectBySlug } from "@/lib/documents";
 import { validateFieldPointImportRow } from "@/lib/field-point-import";
+import { getFieldPointById } from "@/lib/field-points";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { FieldPointImportRow } from "@/lib/types";
 
@@ -16,8 +17,9 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
   }
 
   const project = await getProjectBySlug(projectSlug);
+  const { user } = await getCurrentUserContext();
 
-  if (!project) {
+  if (!project || !user) {
     redirect(`/projects/${projectSlug}/field-points/import?error=project-not-found`);
   }
 
@@ -40,6 +42,9 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
     .filter((row) => row.validationIssues.length === 0)
     .map((row) => ({
       project_id: project.id,
+      uploaded_by_user_id: user.id,
+      uploaded_by_email: user.email ?? null,
+      import_source_file: `${formData.get("source_file_name") ?? ""}`.trim() || null,
       point_name: row.point_name,
       point_type: row.point_type,
       easting: row.easting ?? null,
@@ -78,7 +83,8 @@ export async function deleteFieldPoint(projectSlug: string, fieldPointId: string
   }
 
   try {
-    await requireUploadManagementRole();
+    const fieldPoint = await getFieldPointById(fieldPointId);
+    await requireUploadManagementRole(fieldPoint?.uploaded_by_user_id);
   } catch {
     redirect(`/projects/${projectSlug}/field-points?error=forbidden`);
   }

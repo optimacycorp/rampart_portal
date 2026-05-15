@@ -38,6 +38,9 @@ export type ReviewerComment = {
 export type FieldPoint = {
   id: string;
   project_id?: string;
+  uploaded_by_user_id?: string | null;
+  uploaded_by_email?: string | null;
+  import_source_file?: string | null;
   point_name: string;
   point_type: string;
   easting?: number;
@@ -92,6 +95,8 @@ export type DocumentType =
 export type ProjectDocument = {
   id: string;
   project_id: string;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
   title: string;
   document_type: DocumentType;
   record_date: string | null;
@@ -111,6 +116,8 @@ export type ProjectDocument = {
 export type DocumentVersion = {
   id: string;
   document_id: string;
+  uploaded_by_user_id?: string | null;
+  uploaded_by_email?: string | null;
   version_number: number;
   file_path: string;
   notes: string | null;

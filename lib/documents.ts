@@ -6,6 +6,8 @@ const fallbackDocuments: ProjectDocument[] = [
   {
     id: "doc-fallback-1",
     project_id: seededProject.id,
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
     title: "Access Exhibit Index",
     document_type: "easement",
     record_date: null,
@@ -24,6 +26,8 @@ const fallbackDocuments: ProjectDocument[] = [
   {
     id: "doc-fallback-2",
     project_id: seededProject.id,
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
     title: "Drainage Observation Log",
     document_type: "drainage_report",
     record_date: null,
@@ -46,6 +50,8 @@ const fallbackDocumentVersions: Record<string, DocumentVersion[]> = {
     {
       id: "doc-fallback-1-v1",
       document_id: "doc-fallback-1",
+      uploaded_by_user_id: "demo-owner",
+      uploaded_by_email: "team@rampart-range.org",
       version_number: 1,
       file_path: "fallback/access-exhibit-index.pdf",
       notes: "Initial fallback version.",
@@ -58,6 +64,8 @@ const fallbackDocumentVersions: Record<string, DocumentVersion[]> = {
     {
       id: "doc-fallback-2-v1",
       document_id: "doc-fallback-2",
+      uploaded_by_user_id: "demo-owner",
+      uploaded_by_email: "team@rampart-range.org",
       version_number: 1,
       file_path: "fallback/drainage-observation-log.pdf",
       notes: "Initial fallback version.",
@@ -104,7 +112,7 @@ export async function getDocumentsByProjectSlug(projectSlug: string): Promise<Pr
   const { data, error } = await supabase
     .from("documents")
     .select(
-      "id, project_id, title, document_type, record_date, reception_number, book, page, source_agency, file_path, external_url, notes, status, current_version_number, created_at, updated_at"
+      "id, project_id, created_by_user_id, created_by_email, title, document_type, record_date, reception_number, book, page, source_agency, file_path, external_url, notes, status, current_version_number, created_at, updated_at"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -126,7 +134,7 @@ export async function getDocumentById(documentId: string): Promise<ProjectDocume
   const { data, error } = await supabase
     .from("documents")
     .select(
-      "id, project_id, title, document_type, record_date, reception_number, book, page, source_agency, file_path, external_url, notes, status, current_version_number, created_at, updated_at"
+      "id, project_id, created_by_user_id, created_by_email, title, document_type, record_date, reception_number, book, page, source_agency, file_path, external_url, notes, status, current_version_number, created_at, updated_at"
     )
     .eq("id", documentId)
     .single();
@@ -147,7 +155,7 @@ export async function getDocumentVersions(documentId: string): Promise<DocumentV
 
   const { data, error } = await supabase
     .from("document_versions")
-    .select("id, document_id, version_number, file_path, notes, is_current, superseded_at, created_at")
+    .select("id, document_id, uploaded_by_user_id, uploaded_by_email, version_number, file_path, notes, is_current, superseded_at, created_at")
     .eq("document_id", documentId)
     .order("version_number", { ascending: false });
 
@@ -168,7 +176,7 @@ export async function getDocumentVersionById(versionId: string): Promise<Documen
 
   const { data, error } = await supabase
     .from("document_versions")
-    .select("id, document_id, version_number, file_path, notes, is_current, superseded_at, created_at")
+    .select("id, document_id, uploaded_by_user_id, uploaded_by_email, version_number, file_path, notes, is_current, superseded_at, created_at")
     .eq("id", versionId)
     .single();
 

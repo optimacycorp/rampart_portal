@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { deleteProjectDocument, uploadProjectDocument } from "@/app/projects/[projectId]/documents/actions";
-import { canManageUploads } from "@/lib/auth-server";
 import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentUploadForm } from "@/components/DocumentUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
@@ -19,10 +19,14 @@ const feedbackText: Record<string, string> = {
   "document-save-failed": "The document record could not be saved after upload.",
   "document-version-save-failed": "The document version history could not be updated.",
   deleted: "Document upload deleted.",
-  forbidden: "Only owner or audit roles can delete uploaded records.",
+  forbidden: "Only the uploader or an audit user can delete uploaded records.",
   "document-delete-failed": "The document could not be deleted.",
   "document-not-found": "The requested document could not be found."
 };
+
+function formatDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString() : "No record date";
+}
 
 export default async function DocumentsPage({
   params,
@@ -33,10 +37,10 @@ export default async function DocumentsPage({
 }) {
   const { projectId } = await params;
   const query = await searchParams;
-  const [project, documents, canDelete] = await Promise.all([
+  const [{ user, role }, project, documents] = await Promise.all([
+    getCurrentUserContext(),
     getProjectBySlug(projectId),
-    getDocumentsByProjectSlug(projectId),
-    canManageUploads()
+    getDocumentsByProjectSlug(projectId)
   ]);
   const supabaseConfigured = Boolean(getSupabaseAdminClient());
 
@@ -104,31 +108,40 @@ export default async function DocumentsPage({
                 No project documents have been uploaded yet.
               </div>
             ) : null}
-            {documents.map((document) => (
-              <div key={document.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <Link href={`/projects/${projectId}/documents/${document.id}`} className="block flex-1 space-y-1">
-                    <p className="font-medium text-slate-800">{document.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {document.document_type} • {document.source_agency ?? "Source pending"}
-                    </p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {document.record_date ?? "No record date"} • {document.file_path ? "File attached" : "Metadata only"} • v{document.current_version_number}
-                    </p>
-                  </Link>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                      {document.status}
-                    </span>
-                    {canDelete ? (
-                      <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
-                        <DeleteButton label="Delete" />
-                      </form>
-                    ) : null}
+            {documents.map((document) => {
+              const canDelete = role === "audit" || (Boolean(user) && document.created_by_user_id === user?.id);
+
+              return (
+                <div key={document.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <Link href={`/projects/${projectId}/documents/${document.id}`} className="block flex-1 space-y-2">
+                      <p className="font-medium text-slate-800">{document.title}</p>
+                      <p className="text-sm text-slate-500">
+                        {document.document_type} • {document.source_agency ?? "Source pending"}
+                      </p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                        {formatDate(document.record_date)} • {document.file_path ? "File attached" : "Metadata only"} •
+                        <span className="ml-1">v{document.current_version_number}</span>
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Uploaded by {document.created_by_email ?? "Unknown"} on{" "}
+                        {new Date(document.created_at).toLocaleDateString()}
+                      </p>
+                    </Link>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                        {document.status}
+                      </span>
+                      {canDelete ? (
+                        <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
+                          <DeleteButton label="Delete" />
+                        </form>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

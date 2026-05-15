@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUploadManagementRole } from "@/lib/auth-server";
+import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
@@ -19,8 +19,9 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
   }
 
   const project = await getProjectBySlug(projectSlug);
+  const { user } = await getCurrentUserContext();
 
-  if (!project) {
+  if (!project || !user) {
     redirect(`/projects/${projectSlug}/documents?error=project-not-found`);
   }
 
@@ -72,6 +73,8 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
       source_agency: sourceAgency || null,
       notes: notes || null,
       external_url: externalUrl || null,
+      created_by_user_id: user.id,
+      created_by_email: user.email ?? null,
       file_path: storagePath,
       status: "uploaded",
       current_version_number: 1
@@ -86,6 +89,8 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
 
   const { error: versionInsertError } = await supabase.from("document_versions").insert({
     document_id: documentInsert.id,
+    uploaded_by_user_id: user.id,
+    uploaded_by_email: user.email ?? null,
     version_number: 1,
     file_path: storagePath,
     notes: notes || null,
@@ -114,8 +119,9 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
     getDocumentById(documentId),
     getDocumentVersions(documentId)
   ]);
+  const { user } = await getCurrentUserContext();
 
-  if (!project || !document) {
+  if (!project || !document || !user) {
     redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-not-found`);
   }
 
@@ -160,6 +166,8 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
 
   const { error: versionInsertError } = await supabase.from("document_versions").insert({
     document_id: documentId,
+    uploaded_by_user_id: user.id,
+    uploaded_by_email: user.email ?? null,
     version_number: nextVersionNumber,
     file_path: storagePath,
     notes: versionNotes || null,
@@ -196,17 +204,19 @@ export async function deleteProjectDocument(projectSlug: string, documentId: str
     redirect(`/projects/${projectSlug}/documents?error=supabase-not-configured`);
   }
 
-  try {
-    await requireUploadManagementRole();
-  } catch {
-    redirect(`/projects/${projectSlug}/documents?error=forbidden`);
-  }
-
-  const [document, versions] = await Promise.all([getDocumentById(documentId), getDocumentVersions(documentId)]);
+  const document = await getDocumentById(documentId);
 
   if (!document) {
     redirect(`/projects/${projectSlug}/documents?error=document-not-found`);
   }
+
+  try {
+    await requireUploadManagementRole(document.created_by_user_id);
+  } catch {
+    redirect(`/projects/${projectSlug}/documents?error=forbidden`);
+  }
+
+  const versions = await getDocumentVersions(documentId);
 
   const filePaths = versions.map((version) => version.file_path).filter(Boolean);
 
