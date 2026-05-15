@@ -15,6 +15,7 @@ export const seededProject: Project = {
 export const seededReviewerComments: ReviewerComment[] = [
   {
     id: "c1",
+    project_id: seededProject.id,
     application_number: "SUBD-24-0106",
     comment_id: "PLN-01",
     reviewer_name: "Planning Staff",
@@ -24,10 +25,12 @@ export const seededReviewerComments: ReviewerComment[] = [
     responsible_party: "Thomas",
     comment_text: "Clarify the document trail supporting private access assumptions.",
     response_text: "Collecting deed and easement support into the portal.",
+    linked_document_id: "doc-fallback-1",
     linked_document_title: "Access Exhibit Index"
   },
   {
     id: "c2",
+    project_id: seededProject.id,
     application_number: "DEPN-25-0102",
     comment_id: "SWENT-04",
     reviewer_name: "Stormwater Reviewer",
@@ -39,6 +42,7 @@ export const seededReviewerComments: ReviewerComment[] = [
   },
   {
     id: "c3",
+    project_id: seededProject.id,
     application_number: "STM-MP24-0278",
     comment_id: "FIRE-02",
     reviewer_name: "Fire Reviewer",
@@ -48,6 +52,35 @@ export const seededReviewerComments: ReviewerComment[] = [
     responsible_party: "Fire",
     comment_text: "Provide access observations relevant to seasonal or gate-related constraints."
   }
+];
+
+export const seededApplicationNumbers = [
+  "SUBD-24-0106",
+  "DEPN-25-0102",
+  "STM-MP24-0278",
+  "STM-REV24-0768"
+];
+
+export const seededDepartments = [
+  "Planning",
+  "City Engineering - SWENT",
+  "City Engineering Dev Review",
+  "Colorado Springs Utilities",
+  "Fire",
+  "Real Estate Services",
+  "Regional Building",
+  "USFS"
+];
+
+export const seededResponsibleParties = [
+  "Thomas",
+  "Dave Gorman / MVE",
+  "Surveyor",
+  "City Planning",
+  "CSU",
+  "USFS",
+  "Fire",
+  "TBD"
 ];
 
 export const seededFieldPoints: FieldPoint[] = [

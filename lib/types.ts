@@ -11,6 +11,7 @@ export type Project = {
 
 export type ReviewerComment = {
   id: string;
+  project_id?: string;
   application_number: string;
   comment_id: string;
   reviewer_name: string;
@@ -27,7 +28,11 @@ export type ReviewerComment = {
   responsible_party: string;
   comment_text: string;
   response_text?: string;
+  linked_document_id?: string | null;
   linked_document_title?: string;
+  due_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type FieldPoint = {
