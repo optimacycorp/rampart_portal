@@ -37,6 +37,24 @@ export type ReviewerComment = {
 
 export type FieldPoint = {
   id: string;
+  project_id?: string;
+  point_name: string;
+  point_type: string;
+  easting?: number;
+  northing?: number;
+  elevation?: number;
+  coordinate_system?: string;
+  latitude?: number;
+  longitude?: number;
+  collection_method?: string;
+  source_equipment?: string;
+  confidence: string;
+  description?: string;
+  photo_document_id?: string | null;
+  created_at?: string;
+};
+
+export type FieldPointImportRow = {
   point_name: string;
   point_type: string;
   easting?: number;
@@ -44,8 +62,11 @@ export type FieldPoint = {
   elevation?: number;
   latitude?: number;
   longitude?: number;
-  confidence: string;
   description?: string;
+  source_equipment?: string;
+  collection_method?: string;
+  confidence: string;
+  validationIssues: string[];
 };
 
 export type DocumentType =

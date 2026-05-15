@@ -1,8 +1,29 @@
+import { importFieldPoints } from "@/app/projects/[projectId]/field-points/actions";
+import { FieldPointImportWizard } from "@/components/FieldPointImportWizard";
 import { CsvTemplateCard } from "@/components/CsvTemplateCard";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 
-export default function FieldPointImportPage() {
+const feedbackText: Record<string, string> = {
+  "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
+  "project-not-found": "The requested project could not be found.",
+  "no-preview-data": "Upload and preview a CSV before saving.",
+  "invalid-preview-data": "The preview payload could not be parsed.",
+  "no-valid-rows": "No valid field point rows were available to save.",
+  "save-failed": "The field point import could not be saved."
+};
+
+export default async function FieldPointImportPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { projectId } = await params;
+  const query = await searchParams;
+  const action = importFieldPoints.bind(null, projectId);
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -10,23 +31,13 @@ export default function FieldPointImportPage() {
         title="CSV import workflow"
         description="Sprint 1 import flow includes CSV upload, manual column mapping, validation, missing-coordinate flags, preview, and save."
       />
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-          <h2 className="text-xl font-semibold text-ink">Import steps</h2>
-          <div className="mt-4 space-y-3">
-            {[
-              "1. Upload CSV",
-              "2. Map columns to required field point attributes",
-              "3. Validate required fields and flag missing coordinate values",
-              "4. Preview parsed records before save",
-              "5. Save accepted rows to field_points"
-            ].map((step) => (
-              <div key={step} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {step}
-              </div>
-            ))}
-          </div>
+      {query.error && feedbackText[query.error] ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {feedbackText[query.error]}
         </div>
+      ) : null}
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <FieldPointImportWizard action={action} />
         <CsvTemplateCard />
       </div>
       <DisclaimerBanner />
