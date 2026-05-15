@@ -60,6 +60,7 @@ export type FieldPointImportRow = {
   easting?: number;
   northing?: number;
   elevation?: number;
+  coordinate_system?: string;
   latitude?: number;
   longitude?: number;
   description?: string;

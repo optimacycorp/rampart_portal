@@ -44,6 +44,7 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
       easting: row.easting ?? null,
       northing: row.northing ?? null,
       elevation: row.elevation ?? null,
+      coordinate_system: row.coordinate_system || null,
       latitude: row.latitude ?? null,
       longitude: row.longitude ?? null,
       description: row.description ?? null,

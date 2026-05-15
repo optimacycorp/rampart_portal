@@ -5,6 +5,9 @@ import {
   FIELD_POINT_CONFIDENCE_OPTIONS,
   FIELD_POINT_IMPORT_FIELDS,
   FIELD_POINT_TYPE_OPTIONS,
+  inferConfidence,
+  inferFieldMapping,
+  inferPointType,
   validateFieldPointImportRow
 } from "@/lib/field-point-import";
 import { FieldPointImportRow } from "@/lib/types";
@@ -87,16 +90,23 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
     return rows.map((row) =>
       validateFieldPointImportRow({
         point_name: row[columnMap.point_name ?? ""]?.trim() ?? "",
-        point_type: row[columnMap.point_type ?? ""]?.trim() ?? "",
+        point_type: inferPointType(
+          row[columnMap.point_type ?? ""]?.trim() ?? "",
+          row[columnMap.description ?? ""]?.trim() ?? ""
+        ),
         easting: parseNumeric(row[columnMap.easting ?? ""] ?? ""),
         northing: parseNumeric(row[columnMap.northing ?? ""] ?? ""),
         elevation: parseNumeric(row[columnMap.elevation ?? ""] ?? ""),
+        coordinate_system: row[columnMap.coordinate_system ?? ""]?.trim() ?? "",
         latitude: parseNumeric(row[columnMap.latitude ?? ""] ?? ""),
         longitude: parseNumeric(row[columnMap.longitude ?? ""] ?? ""),
         description: row[columnMap.description ?? ""]?.trim() ?? "",
         source_equipment: row[columnMap.source_equipment ?? ""]?.trim() ?? "",
         collection_method: row[columnMap.collection_method ?? ""]?.trim() ?? "",
-        confidence: row[columnMap.confidence ?? ""]?.trim() || "field_observed"
+        confidence: inferConfidence(
+          row[columnMap.confidence ?? ""]?.trim() ?? "",
+          row[columnMap.collection_method ?? ""]?.trim() ?? ""
+        )
       })
     );
   }, [columnMap, rows]);
@@ -120,12 +130,7 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
     setRows(parsed.rows);
     setFileName(file.name);
 
-    const inferredMap = FIELD_POINT_IMPORT_FIELDS.reduce<Record<string, string>>((accumulator, field) => {
-      accumulator[field] = parsed.headers.find((header) => header.toLowerCase() === field.toLowerCase()) ?? "";
-      return accumulator;
-    }, {});
-
-    setColumnMap(inferredMap);
+    setColumnMap(inferFieldMapping(parsed.headers));
   }
 
   return (
@@ -183,6 +188,8 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
             Allowed point types: {FIELD_POINT_TYPE_OPTIONS.join(", ")}
             <br />
             Allowed confidence values: {FIELD_POINT_CONFIDENCE_OPTIONS.join(", ")}
+            <br />
+            Emlid exports with headers like <code>Name</code>, <code>Code</code>, <code>Easting</code>, <code>Northing</code>, <code>CS name</code>, and <code>Solution status</code> are auto-mapped.
           </div>
         </div>
       ) : null}
