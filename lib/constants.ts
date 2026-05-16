@@ -21,3 +21,7 @@ export const DOCUMENT_TYPE_OPTIONS = [
   "lidar",
   "other"
 ] as const;
+
+export const CULVERT_MATERIAL_OPTIONS = ["CMP", "HDPE", "RCP", "PVC", "concrete", "unknown", "other"] as const;
+
+export const CULVERT_OWNERSHIP_OPTIONS = ["private", "city", "usfs", "unknown", "shared"] as const;

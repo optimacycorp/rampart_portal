@@ -80,6 +80,7 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<RawRow[]>([]);
   const [fileName, setFileName] = useState("");
+  const [importBatchName, setImportBatchName] = useState("");
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
 
   const previewRows = useMemo(() => {
@@ -148,6 +149,16 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
             type="file"
           />
         </div>
+        <label className="mt-4 block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Import batch name</span>
+          <input
+            value={importBatchName}
+            onChange={(event) => setImportBatchName(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+            placeholder="As-Built May 2026"
+            type="text"
+          />
+        </label>
         {fileName ? (
           <p className="mt-3 text-sm text-slate-500">
             Loaded <span className="font-medium text-slate-700">{fileName}</span> with {rows.length} rows.
@@ -208,6 +219,7 @@ export function FieldPointImportWizard({ action }: FieldPointImportWizardProps) 
             <form action={action}>
               <input type="hidden" name="rows_json" value={JSON.stringify(previewRows)} readOnly />
               <input type="hidden" name="source_file_name" value={fileName} readOnly />
+              <input type="hidden" name="import_batch_name" value={importBatchName} readOnly />
               <button
                 type="submit"
                 className="rounded-full bg-pine px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"

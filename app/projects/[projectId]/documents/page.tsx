@@ -5,6 +5,7 @@ import { DocumentUploadForm } from "@/components/DocumentUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
@@ -33,7 +34,7 @@ export default async function DocumentsPage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; type?: string }>;
 }) {
   const { projectId } = await params;
   const query = await searchParams;
@@ -43,6 +44,10 @@ export default async function DocumentsPage({
     getDocumentsByProjectSlug(projectId)
   ]);
   const supabaseConfigured = Boolean(getSupabaseAdminClient());
+  const activeType = DOCUMENT_TYPE_OPTIONS.includes((query.type ?? "") as (typeof DOCUMENT_TYPE_OPTIONS)[number])
+    ? query.type
+    : "";
+  const filteredDocuments = activeType ? documents.filter((document) => document.document_type === activeType) : documents;
 
   if (!project) {
     return (
@@ -76,6 +81,32 @@ export default async function DocumentsPage({
           {feedbackText[query.error]}
         </div>
       ) : null}
+      <form className="flex items-center gap-3" method="get">
+        <label className="text-sm font-medium text-slate-700" htmlFor="type">
+          Document type
+        </label>
+        <select
+          id="type"
+          name="type"
+          defaultValue={activeType}
+          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-pine"
+        >
+          <option value="">All types</option>
+          {DOCUMENT_TYPE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <button type="submit" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+          Apply
+        </button>
+        {activeType ? (
+          <Link href={`/projects/${projectId}/documents`} className="text-sm font-medium text-pine">
+            Clear
+          </Link>
+        ) : null}
+      </form>
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
@@ -100,15 +131,17 @@ export default async function DocumentsPage({
               <h2 className="text-xl font-semibold text-ink">Current document list</h2>
               <p className="mt-2 text-sm text-slate-600">Most recent records appear first.</p>
             </div>
-            <span className="text-sm text-slate-500">{documents.length} documents</span>
+            <span className="text-sm text-slate-500">
+              {filteredDocuments.length} of {documents.length} documents
+            </span>
           </div>
           <div className="mt-4 space-y-3">
-            {documents.length === 0 ? (
+            {filteredDocuments.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-                No project documents have been uploaded yet.
+                {documents.length === 0 ? "No project documents have been uploaded yet." : "No documents match the selected type."}
               </div>
             ) : null}
-            {documents.map((document) => {
+            {filteredDocuments.map((document) => {
               const canDelete = role === "audit" || (Boolean(user) && document.created_by_user_id === user?.id);
 
               return (

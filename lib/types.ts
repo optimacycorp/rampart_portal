@@ -41,6 +41,7 @@ export type FieldPoint = {
   uploaded_by_user_id?: string | null;
   uploaded_by_email?: string | null;
   import_source_file?: string | null;
+  import_batch_name?: string | null;
   point_name: string;
   point_type: string;
   easting?: number;
@@ -73,6 +74,24 @@ export type FieldPointImportRow = {
   confidence: string;
   collected_at?: string;
   validationIssues: string[];
+};
+
+export type Culvert = {
+  id: string;
+  project_id: string;
+  culvert_id: string;
+  inlet_point_id: string | null;
+  outlet_point_id: string | null;
+  diameter_inches: number | null;
+  material: string | null;
+  length_feet: number | null;
+  slope_percent: number | null;
+  condition: string | null;
+  ownership: string | null;
+  flow_direction: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at?: string;
 };
 
 export type DocumentType =

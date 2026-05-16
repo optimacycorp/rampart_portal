@@ -24,7 +24,7 @@ export async function getFieldPointsByProjectSlug(projectSlug: string): Promise<
   const { data, error } = await supabase
     .from("field_points")
     .select(
-      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
+      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, import_batch_name, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -46,7 +46,7 @@ export async function getFieldPointById(fieldPointId: string): Promise<FieldPoin
   const { data, error } = await supabase
     .from("field_points")
     .select(
-      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
+      "id, project_id, uploaded_by_user_id, uploaded_by_email, import_source_file, import_batch_name, point_name, point_type, easting, northing, elevation, coordinate_system, latitude, longitude, collection_method, source_equipment, confidence, description, photo_document_id, collected_at, created_at"
     )
     .eq("id", fieldPointId)
     .single();

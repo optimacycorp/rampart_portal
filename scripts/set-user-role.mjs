@@ -26,16 +26,11 @@ function readArg(flag) {
 loadEnvFile();
 
 const email = readArg("--email") ?? readArg("--user-id");
-const password = readArg("--password");
-const role = readArg("--role") ?? "viewer";
-const fullName = readArg("--full-name") ?? "";
-const organization = readArg("--organization") ?? "";
+const role = readArg("--role");
 const validRoles = new Set(["owner", "audit", "engineer", "surveyor", "collaborator", "viewer"]);
 
-if (!email || !password) {
-  console.error(
-    "Usage: npm run create-user -- --email user@example.com --password 'StrongPass123!' --role audit --full-name 'User Name' --organization 'Org'"
-  );
+if (!email || !role) {
+  console.error("Usage: npm run set-user-role -- --email user@example.com --role owner");
   process.exit(1);
 }
 
@@ -83,47 +78,23 @@ async function findUserByEmail(targetEmail) {
   }
 }
 
-let user = null;
+const user = await findUserByEmail(email);
 
-const existingUser = await findUserByEmail(email);
-
-if (existingUser) {
-  const { data: updatedUser, error: updateError } = await supabase.auth.admin.updateUserById(existingUser.id, {
-    password,
-    email_confirm: true
-  });
-
-  if (updateError || !updatedUser.user) {
-    console.error("Failed to update existing user:", updateError?.message ?? "Unknown error");
-    process.exit(1);
-  }
-
-  user = updatedUser.user;
-} else {
-  const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true
-  });
-
-  if (userError || !userData.user) {
-    console.error("Failed to create user:", userError?.message ?? "Unknown error");
-    process.exit(1);
-  }
-
-  user = userData.user;
-}
-
-const { error: profileError } = await supabase.from("profiles").upsert({
-  id: user.id,
-  full_name: fullName || email,
-  role,
-  organization: organization || null
-});
-
-if (profileError) {
-  console.error("User created but profile upsert failed:", profileError.message);
+if (!user) {
+  console.error(`No auth user found for ${email}.`);
   process.exit(1);
 }
 
-console.log(`${existingUser ? "Updated" : "Created"} user ${email} with role ${role}.`);
+const { error } = await supabase.from("profiles").upsert({
+  id: user.id,
+  full_name: user.user_metadata?.full_name ?? user.email ?? email,
+  role,
+  organization: user.user_metadata?.organization ?? null
+});
+
+if (error) {
+  console.error("Failed to update profile role:", error.message);
+  process.exit(1);
+}
+
+console.log(`Updated ${email} to role ${role}.`);

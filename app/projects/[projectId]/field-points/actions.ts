@@ -45,6 +45,7 @@ export async function importFieldPoints(projectSlug: string, formData: FormData)
       uploaded_by_user_id: user.id,
       uploaded_by_email: user.email ?? null,
       import_source_file: `${formData.get("source_file_name") ?? ""}`.trim() || null,
+      import_batch_name: `${formData.get("import_batch_name") ?? ""}`.trim() || null,
       point_name: row.point_name,
       point_type: row.point_type,
       easting: row.easting ?? null,

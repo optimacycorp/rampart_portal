@@ -14,13 +14,19 @@ export default async function FieldPointsPage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; batch?: string }>;
 }) {
   const { projectId } = await params;
   const query = await searchParams;
   const [{ user, role }, fieldPoints] = await Promise.all([getCurrentUserContext(), getFieldPointsByProjectSlug(projectId)]);
-  const visiblePoints = fieldPoints.slice(0, 10);
-  const hiddenPoints = fieldPoints.slice(10);
+  const batchOptions = Array.from(
+    new Set(fieldPoints.map((point) => point.import_batch_name).filter((value): value is string => Boolean(value)))
+  ).sort();
+  const filteredPoints = query.batch
+    ? fieldPoints.filter((point) => point.import_batch_name === query.batch)
+    : fieldPoints;
+  const visiblePoints = filteredPoints.slice(0, 10);
+  const hiddenPoints = filteredPoints.slice(10);
 
   return (
     <div className="space-y-8">
@@ -37,6 +43,37 @@ export default async function FieldPointsPage({
           Import CSV
         </Link>
       </div>
+      {batchOptions.length > 0 ? (
+        <form className="flex items-center gap-3" method="get">
+          <label className="text-sm font-medium text-slate-700" htmlFor="batch">
+            Import batch
+          </label>
+          <select
+            id="batch"
+            name="batch"
+            defaultValue={query.batch ?? ""}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-pine"
+          >
+            <option value="">All batches</option>
+            {batchOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Apply
+          </button>
+          {query.batch ? (
+            <Link href={`/projects/${projectId}/field-points`} className="text-sm font-medium text-pine">
+              Clear
+            </Link>
+          ) : null}
+        </form>
+      ) : null}
       {query.status === "imported" ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           Field points imported successfully.
@@ -63,7 +100,7 @@ export default async function FieldPointsPage({
           <span>Uploaded</span>
           <span>Uploader</span>
         </div>
-        {fieldPoints.length === 0 ? (
+        {filteredPoints.length === 0 ? (
           <div className="px-5 py-8 text-sm text-slate-500">No field points have been imported yet.</div>
         ) : null}
         {visiblePoints.map((point) => {
@@ -76,7 +113,9 @@ export default async function FieldPointsPage({
             >
               <div>
                 <div className="font-medium text-slate-800">{point.point_name}</div>
-                <div className="mt-1 text-xs text-slate-500">{point.import_source_file ?? "Manual import"}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {(point.import_batch_name ?? "Unnamed batch")} • {point.import_source_file ?? "Manual import"}
+                </div>
               </div>
               <span>{point.point_type}</span>
               <span>{point.easting ?? "—"}</span>
@@ -112,7 +151,9 @@ export default async function FieldPointsPage({
                 >
                   <div>
                     <div className="font-medium text-slate-800">{point.point_name}</div>
-                    <div className="mt-1 text-xs text-slate-500">{point.import_source_file ?? "Manual import"}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {(point.import_batch_name ?? "Unnamed batch")} • {point.import_source_file ?? "Manual import"}
+                    </div>
                   </div>
                   <span>{point.point_type}</span>
                   <span>{point.easting ?? "—"}</span>
