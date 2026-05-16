@@ -100,3 +100,60 @@ export async function deleteFieldPoint(projectSlug: string, fieldPointId: string
   revalidatePath(`/projects/${projectSlug}/map`);
   redirect(`/projects/${projectSlug}/field-points?status=deleted`);
 }
+
+export async function deleteFieldPointUpload(
+  projectSlug: string,
+  identifierType: "batch" | "file",
+  identifierValue: string
+) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/field-points?error=supabase-not-configured`);
+  }
+
+  const project = await getProjectBySlug(projectSlug);
+  const { user, role } = await getCurrentUserContext();
+
+  if (!project || !user) {
+    redirect(`/projects/${projectSlug}/field-points?error=project-not-found`);
+  }
+
+  const column = identifierType === "batch" ? "import_batch_name" : "import_source_file";
+  const normalizedValue = identifierValue.trim();
+
+  if (!normalizedValue) {
+    redirect(`/projects/${projectSlug}/field-points?error=upload-group-not-found`);
+  }
+
+  const { data: matchingPoints, error: fetchError } = await supabase
+    .from("field_points")
+    .select("id, uploaded_by_user_id")
+    .eq("project_id", project.id)
+    .eq(column, normalizedValue);
+
+  if (fetchError || !matchingPoints || matchingPoints.length === 0) {
+    redirect(`/projects/${projectSlug}/field-points?error=upload-group-not-found`);
+  }
+
+  const canDeleteGroup =
+    role === "audit" || matchingPoints.every((point) => point.uploaded_by_user_id && point.uploaded_by_user_id === user.id);
+
+  if (!canDeleteGroup) {
+    redirect(`/projects/${projectSlug}/field-points?error=forbidden`);
+  }
+
+  const { error } = await supabase
+    .from("field_points")
+    .delete()
+    .eq("project_id", project.id)
+    .eq(column, normalizedValue);
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/field-points?error=delete-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/field-points`);
+  revalidatePath(`/projects/${projectSlug}/map`);
+  redirect(`/projects/${projectSlug}/field-points?status=upload-deleted`);
+}

@@ -25,3 +25,14 @@ export const DOCUMENT_TYPE_OPTIONS = [
 export const CULVERT_MATERIAL_OPTIONS = ["CMP", "HDPE", "RCP", "PVC", "concrete", "unknown", "other"] as const;
 
 export const CULVERT_OWNERSHIP_OPTIONS = ["private", "city", "usfs", "unknown", "shared"] as const;
+
+export const ACCESS_LOG_STATUS_OPTIONS = [
+  "USFS correspondence",
+  "Gate condition",
+  "Road maintenance",
+  "Snow/winter access",
+  "Fire access",
+  "Road drainage",
+  "Turnout/width",
+  "General observation"
+] as const;

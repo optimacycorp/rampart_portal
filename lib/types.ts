@@ -35,6 +35,21 @@ export type ReviewerComment = {
   updated_at?: string;
 };
 
+export type AccessLogEntry = {
+  id: string;
+  project_id?: string;
+  log_date: string | null;
+  access_feature: string;
+  status: string | null;
+  description: string | null;
+  road_condition: string | null;
+  gate_condition: string | null;
+  weather: string | null;
+  linked_document_id?: string | null;
+  linked_document_title?: string | null;
+  created_at?: string;
+};
+
 export type FieldPoint = {
   id: string;
   project_id?: string;

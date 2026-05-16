@@ -1,4 +1,4 @@
-import { FieldPoint, Project, ReviewerComment } from "@/lib/types";
+import { AccessLogEntry, FieldPoint, Project, ReviewerComment } from "@/lib/types";
 
 export const seededProject: Project = {
   id: "4d00e17d-0bcf-4840-83a7-9d24f8079f11",
@@ -132,5 +132,34 @@ export const seededFieldPoints: FieldPoint[] = [
     confidence: "field_observed",
     description: "Observed inlet on uphill road edge",
     collected_at: "2026-02-08T13:29:00-06:00"
+  }
+];
+
+export const seededAccessLogs: AccessLogEntry[] = [
+  {
+    id: "access-1",
+    project_id: seededProject.id,
+    log_date: "2026-05-10",
+    access_feature: "FS 0300 road segment",
+    status: "Road maintenance",
+    description: "Observed rutting and drainage crossing near turnout.",
+    road_condition: "Rutting near crossing",
+    gate_condition: null,
+    weather: "Dry",
+    linked_document_id: "doc-fallback-2",
+    linked_document_title: "Drainage Observation Log"
+  },
+  {
+    id: "access-2",
+    project_id: seededProject.id,
+    log_date: "2026-05-06",
+    access_feature: "Garden of the Gods gate",
+    status: "Gate condition",
+    description: "Gate condition documented with photo set and access notes.",
+    road_condition: null,
+    gate_condition: "Operational during visit",
+    weather: "Clear",
+    linked_document_id: "doc-fallback-1",
+    linked_document_title: "Access Exhibit Index"
   }
 ];
