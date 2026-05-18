@@ -50,6 +50,50 @@ export type AccessLogEntry = {
   created_at?: string;
 };
 
+export type ProjectTask = {
+  id: string;
+  project_id?: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  responsible_party?: string | null;
+  waiting_on?: string | null;
+  due_date?: string | null;
+  linked_comment_id?: string | null;
+  linked_document_id?: string | null;
+  linked_document_title?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DocumentChunk = {
+  id: string;
+  project_id: string;
+  document_id: string;
+  chunk_text: string;
+  page_number?: number | null;
+  section_label?: string | null;
+  created_at?: string;
+};
+
+export type MeetingTranscript = {
+  id: string;
+  project_id: string;
+  title: string;
+  meeting_date?: string | null;
+  participants?: string | null;
+  source?: string | null;
+  audio_file_path?: string | null;
+  transcript_file_path?: string | null;
+  transcript_text?: string | null;
+  notes?: string | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type FieldPoint = {
   id: string;
   project_id?: string;

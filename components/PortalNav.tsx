@@ -15,6 +15,7 @@ const links = [
   { href: `/projects/${seededProject.slug}/field-points`, label: "Field Points" },
   { href: `/projects/${seededProject.slug}/culverts`, label: "Culverts" },
   { href: `/projects/${seededProject.slug}/access-log`, label: "Access Log" },
+  { href: `/projects/${seededProject.slug}/transcripts`, label: "Transcripts" },
   { href: `/projects/${seededProject.slug}/photos`, label: "Photos" },
   { href: `/projects/${seededProject.slug}/exports`, label: "Exports" }
 ];

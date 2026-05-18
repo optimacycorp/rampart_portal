@@ -3,6 +3,7 @@ import "@/app/globals.css";
 import { AppShell } from "@/components/AppShell";
 import { PortalFooter } from "@/components/PortalFooter";
 import { PortalNav } from "@/components/PortalNav";
+import { ProjectAssistant } from "@/components/ProjectAssistant";
 import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUserContext } from "@/lib/auth-server";
 
@@ -41,6 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </header>
           <AppShell>{children}</AppShell>
+          <ProjectAssistant />
           <PortalFooter />
         </div>
       </body>

@@ -11,6 +11,7 @@ const projectLinks = [
   { href: "field-points", label: "Field Points", hint: "Import and validate Emlid or survey-adjacent GPS points." },
   { href: "culverts", label: "Culverts", hint: "Register culvert assets with inlet and outlet references." },
   { href: "access-log", label: "Access Log", hint: "Capture FS 0300 road, gate, and access observations." },
+  { href: "transcripts", label: "Meeting Transcripts", hint: "Store meeting audio, transcript files, and pasted transcript text." },
   { href: "photos", label: "Photo Library", hint: "Store categorized evidence photography and linked stations." },
   { href: "exports", label: "Exports", hint: "Prepare lightweight coordination reports and record bundles." }
 ];

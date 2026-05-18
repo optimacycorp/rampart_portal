@@ -1,4 +1,12 @@
-import { AccessLogEntry, FieldPoint, Project, ReviewerComment } from "@/lib/types";
+import {
+  AccessLogEntry,
+  DocumentChunk,
+  FieldPoint,
+  MeetingTranscript,
+  Project,
+  ProjectTask,
+  ReviewerComment
+} from "@/lib/types";
 
 export const seededProject: Project = {
   id: "4d00e17d-0bcf-4840-83a7-9d24f8079f11",
@@ -161,5 +169,75 @@ export const seededAccessLogs: AccessLogEntry[] = [
     weather: "Clear",
     linked_document_id: "doc-fallback-1",
     linked_document_title: "Access Exhibit Index"
+  }
+];
+
+export const seededProjectTasks: ProjectTask[] = [
+  {
+    id: "task-1",
+    project_id: seededProject.id,
+    title: "Compile USFS access coordination package",
+    description: "Assemble recent correspondence, access observations, and gate status records for the next USFS follow-up.",
+    status: "open",
+    priority: "high",
+    responsible_party: "Thomas",
+    waiting_on: "USFS",
+    linked_document_id: "doc-fallback-1",
+    linked_document_title: "Access Exhibit Index"
+  },
+  {
+    id: "task-2",
+    project_id: seededProject.id,
+    title: "Confirm drainage support for culvert assumptions",
+    description: "Tie culvert field observations to open SWENT comments and supporting drainage notes.",
+    status: "in_progress",
+    priority: "critical",
+    responsible_party: "Dave Gorman / MVE",
+    waiting_on: "Dave / MVE",
+    linked_document_id: "doc-fallback-2",
+    linked_document_title: "Drainage Observation Log"
+  }
+];
+
+export const seededDocumentChunks: DocumentChunk[] = [
+  {
+    id: "chunk-1",
+    project_id: seededProject.id,
+    document_id: "doc-fallback-1",
+    page_number: 1,
+    section_label: "Legal access summary",
+    chunk_text:
+      "Access Exhibit Index summarizes deed and easement materials assembled to support the project's legal access record. Additional USFS coordination records may still be needed.",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "chunk-2",
+    project_id: seededProject.id,
+    document_id: "doc-fallback-2",
+    page_number: 1,
+    section_label: "Drainage field notes",
+    chunk_text:
+      "Drainage Observation Log notes culvert observations, road runoff patterns, and follow-up support requested by stormwater review.",
+    created_at: new Date().toISOString()
+  }
+];
+
+export const seededMeetingTranscripts: MeetingTranscript[] = [
+  {
+    id: "transcript-1",
+    project_id: seededProject.id,
+    title: "USFS access coordination call",
+    meeting_date: "2026-05-12",
+    participants: "Thomas, USFS representative, Dave Gorman / MVE",
+    source: "Zoom upload",
+    audio_file_path: null,
+    transcript_file_path: null,
+    transcript_text:
+      "Discussion covered access coordination, gate status observations, and additional records needed before the next USFS follow-up.",
+    notes: "Fallback transcript example while Supabase is not configured.",
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
