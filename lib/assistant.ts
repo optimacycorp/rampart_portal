@@ -37,6 +37,20 @@ function sourceForDocument(projectSlug: string, documentId: string, title: strin
   };
 }
 
+function sourceForChunk(projectSlug: string, chunk: { document_id?: string | null; transcript_id?: string | null; source_type: "document" | "transcript"; section_label?: string | null; page_number?: number | null }): AssistantSource {
+  if (chunk.source_type === "transcript") {
+    return {
+      href: `/projects/${projectSlug}/transcripts`,
+      label: `Transcript chunk: ${chunk.section_label ?? `Transcript ${chunk.transcript_id ?? ""}`.trim()}`
+    };
+  }
+
+  return {
+    href: `/projects/${projectSlug}/documents/${chunk.document_id}`,
+    label: `Chunk: ${chunk.section_label ?? `Page ${chunk.page_number ?? "unknown"}`}`
+  };
+}
+
 function sourceForComment(projectSlug: string, commentId: string, label: string): AssistantSource {
   return {
     href: `/projects/${projectSlug}/comments#${commentId}`,
@@ -193,10 +207,7 @@ async function answerUsfsAccessStatus(projectSlug: string): Promise<AssistantRes
     ...relevantComments.map((comment) =>
       sourceForComment(projectSlug, comment.id, comment.comment_id || comment.comment_text.slice(0, 40))
     ),
-    ...chunks.map((chunk) => ({
-      href: `/projects/${projectSlug}/documents/${chunk.document_id}`,
-      label: `Chunk: ${chunk.section_label ?? `Page ${chunk.page_number ?? "unknown"}`}`
-    }))
+    ...chunks.map((chunk) => sourceForChunk(projectSlug, chunk))
   ];
 
   const summaryParts: string[] = [];
@@ -338,10 +349,7 @@ async function answerLegalAccessSupport(projectSlug: string): Promise<AssistantR
 
   const sources = [
     ...relevantDocuments.map((document) => sourceForDocument(projectSlug, document.id, document.title)),
-    ...chunks.map((chunk) => ({
-      href: `/projects/${projectSlug}/documents/${chunk.document_id}`,
-      label: `Chunk: ${chunk.section_label ?? `Page ${chunk.page_number ?? "unknown"}`}`
-    }))
+    ...chunks.map((chunk) => sourceForChunk(projectSlug, chunk))
   ];
 
   return {

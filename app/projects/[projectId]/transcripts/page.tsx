@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { deleteMeetingTranscript, uploadMeetingTranscript } from "@/app/projects/[projectId]/transcripts/actions";
+import {
+  deleteMeetingTranscript,
+  ingestTranscriptForAssistant,
+  uploadMeetingTranscript
+} from "@/app/projects/[projectId]/transcripts/actions";
 import { DeleteButton } from "@/components/DeleteButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { MeetingTranscriptUploadForm } from "@/components/MeetingTranscriptUploadForm";
@@ -11,12 +15,14 @@ import { getProjectBySlug } from "@/lib/documents";
 const feedbackText: Record<string, string> = {
   uploaded: "Meeting transcript uploaded.",
   deleted: "Meeting transcript deleted.",
+  "assistant-ingested": "Meeting transcript indexed for assistant search.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
   "missing-required-fields":
     "A meeting title is required, plus at least one of audio upload, transcript file upload, or transcript text.",
   "storage-upload-failed": "The meeting media file could not be uploaded to storage.",
   "save-failed": "The meeting transcript record could not be saved.",
+  "assistant-ingest-failed": "The assistant search index could not be updated for this transcript.",
   forbidden: "Only the uploader or an audit user can delete uploaded transcript records.",
   "delete-failed": "The meeting transcript could not be deleted.",
   "transcript-not-found": "The requested transcript record could not be found."
@@ -140,6 +146,14 @@ export default async function MeetingTranscriptsPage({
                             Open transcript file
                           </Link>
                         ) : null}
+                        <form action={ingestTranscriptForAssistant.bind(null, projectId, transcript.id)}>
+                          <button
+                            type="submit"
+                            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                          >
+                            Index for assistant
+                          </button>
+                        </form>
                       </div>
                     </div>
                     {canDelete ? (

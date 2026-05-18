@@ -3,12 +3,35 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
+import { ingestTranscriptChunks } from "@/lib/document-chunks";
 import { getProjectBySlug } from "@/lib/documents";
 import { getMeetingTranscriptById } from "@/lib/meeting-transcripts";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+async function extractSupportedUploadText(file: FormDataEntryValue | null) {
+  if (!(file instanceof File) || file.size === 0) {
+    return null;
+  }
+
+  const name = file.name.toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  const supportedTextFile =
+    type.startsWith("text/") ||
+    name.endsWith(".txt") ||
+    name.endsWith(".md") ||
+    name.endsWith(".csv") ||
+    name.endsWith(".json");
+
+  if (!supportedTextFile) {
+    return null;
+  }
+
+  const text = (await file.text()).trim();
+  return text || null;
 }
 
 async function uploadOptionalFile(projectSlug: string, transcriptId: string, file: FormDataEntryValue | null, prefix: string) {
@@ -91,6 +114,16 @@ export async function uploadMeetingTranscript(projectSlug: string, formData: For
     redirect(`/projects/${projectSlug}/transcripts?error=save-failed`);
   }
 
+  try {
+    const extractedTranscriptFileText = await extractSupportedUploadText(transcriptFile);
+    await ingestTranscriptChunks(projectSlug, transcriptId, {
+      extractedText: transcriptText || extractedTranscriptFileText || notes || null,
+      sectionLabel: transcriptText || extractedTranscriptFileText ? `${title} transcript text` : `${title} metadata`
+    });
+  } catch (ingestError) {
+    console.error("Automatic transcript assistant ingest failed", ingestError);
+  }
+
   revalidatePath(`/projects/${projectSlug}/transcripts`);
   redirect(`/projects/${projectSlug}/transcripts?status=uploaded`);
 }
@@ -128,4 +161,15 @@ export async function deleteMeetingTranscript(projectSlug: string, transcriptId:
 
   revalidatePath(`/projects/${projectSlug}/transcripts`);
   redirect(`/projects/${projectSlug}/transcripts?status=deleted`);
+}
+
+export async function ingestTranscriptForAssistant(projectSlug: string, transcriptId: string) {
+  const result = await ingestTranscriptChunks(projectSlug, transcriptId);
+
+  if ("error" in result) {
+    redirect(`/projects/${projectSlug}/transcripts?error=assistant-ingest-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/transcripts`);
+  redirect(`/projects/${projectSlug}/transcripts?status=assistant-ingested`);
 }

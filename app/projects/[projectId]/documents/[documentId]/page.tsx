@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { deleteProjectDocument, uploadDocumentVersion } from "@/app/projects/[projectId]/documents/actions";
+import {
+  deleteProjectDocument,
+  ingestDocumentForAssistant,
+  uploadDocumentVersion
+} from "@/app/projects/[projectId]/documents/actions";
 import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentVersionUploadForm } from "@/components/DocumentVersionUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
@@ -49,6 +53,10 @@ export default async function DocumentDetailPage({
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           New document version uploaded and prior versions preserved in history.
         </div>
+      ) : query.status === "assistant-ingested" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          Document metadata and notes were indexed for assistant search.
+        </div>
       ) : null}
       {query.error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
@@ -60,7 +68,9 @@ export default async function DocumentDetailPage({
                 ? "Please choose a replacement file."
                 : query.error === "forbidden"
                   ? "Only the uploader or an audit user can delete uploaded records."
-                  : "The requested document action could not be completed."}
+                  : query.error === "assistant-ingest-failed"
+                    ? "The assistant search index could not be updated for this document."
+                    : "The requested document action could not be completed."}
         </div>
       ) : null}
       <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
@@ -98,6 +108,14 @@ export default async function DocumentDetailPage({
                   Open current file
                 </Link>
               ) : null}
+              <form action={ingestDocumentForAssistant.bind(null, projectId, document.id)}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Index for assistant
+                </button>
+              </form>
               {canDelete ? (
                 <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
                   <DeleteButton label="Delete document" />

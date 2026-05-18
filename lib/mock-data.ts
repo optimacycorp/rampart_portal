@@ -205,6 +205,8 @@ export const seededDocumentChunks: DocumentChunk[] = [
     id: "chunk-1",
     project_id: seededProject.id,
     document_id: "doc-fallback-1",
+    transcript_id: null,
+    source_type: "document",
     page_number: 1,
     section_label: "Legal access summary",
     chunk_text:
@@ -215,10 +217,25 @@ export const seededDocumentChunks: DocumentChunk[] = [
     id: "chunk-2",
     project_id: seededProject.id,
     document_id: "doc-fallback-2",
+    transcript_id: null,
+    source_type: "document",
     page_number: 1,
     section_label: "Drainage field notes",
     chunk_text:
       "Drainage Observation Log notes culvert observations, road runoff patterns, and follow-up support requested by stormwater review.",
+    created_at: new Date().toISOString()
+  }
+  ,
+  {
+    id: "chunk-3",
+    project_id: seededProject.id,
+    document_id: null,
+    transcript_id: "transcript-1",
+    source_type: "transcript",
+    page_number: null,
+    section_label: "USFS access coordination call transcript",
+    chunk_text:
+      "Transcript notes a USFS access coordination call covering gate status observations, access follow-up, and records still needed before the next coordination step.",
     created_at: new Date().toISOString()
   }
 ];

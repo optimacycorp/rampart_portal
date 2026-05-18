@@ -4,11 +4,34 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
+import { ingestDocumentChunks } from "@/lib/document-chunks";
 import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+async function extractSupportedUploadText(file: FormDataEntryValue | null) {
+  if (!(file instanceof File) || file.size === 0) {
+    return null;
+  }
+
+  const name = file.name.toLowerCase();
+  const type = (file.type || "").toLowerCase();
+  const supportedTextFile =
+    type.startsWith("text/") ||
+    name.endsWith(".txt") ||
+    name.endsWith(".md") ||
+    name.endsWith(".csv") ||
+    name.endsWith(".json");
+
+  if (!supportedTextFile) {
+    return null;
+  }
+
+  const text = (await file.text()).trim();
+  return text || null;
 }
 
 export async function uploadProjectDocument(projectSlug: string, formData: FormData) {
@@ -103,6 +126,16 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
     redirect(`/projects/${projectSlug}/documents?error=document-version-save-failed`);
   }
 
+  try {
+    const extractedText = await extractSupportedUploadText(file);
+    await ingestDocumentChunks(projectSlug, documentInsert.id, {
+      extractedText,
+      sectionLabel: extractedText ? `${title} uploaded text` : `${title} metadata`
+    });
+  } catch (error) {
+    console.error("Automatic document assistant ingest failed", error);
+  }
+
   revalidatePath(`/projects/${projectSlug}/documents`);
   redirect(`/projects/${projectSlug}/documents?status=uploaded`);
 }
@@ -192,6 +225,16 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
     redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-save-failed`);
   }
 
+  try {
+    const extractedText = await extractSupportedUploadText(file);
+    await ingestDocumentChunks(projectSlug, documentId, {
+      extractedText: extractedText || versionNotes || null,
+      sectionLabel: extractedText ? `${document.title} version ${nextVersionNumber} text` : `${document.title} metadata`
+    });
+  } catch (error) {
+    console.error("Automatic document version assistant ingest failed", error);
+  }
+
   revalidatePath(`/projects/${projectSlug}/documents`);
   revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
   redirect(`/projects/${projectSlug}/documents/${documentId}?status=version-uploaded`);
@@ -233,4 +276,15 @@ export async function deleteProjectDocument(projectSlug: string, documentId: str
   revalidatePath(`/projects/${projectSlug}/documents`);
   revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
   redirect(`/projects/${projectSlug}/documents?status=deleted`);
+}
+
+export async function ingestDocumentForAssistant(projectSlug: string, documentId: string) {
+  const result = await ingestDocumentChunks(projectSlug, documentId);
+
+  if ("error" in result) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=assistant-ingest-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+  redirect(`/projects/${projectSlug}/documents/${documentId}?status=assistant-ingested`);
 }
