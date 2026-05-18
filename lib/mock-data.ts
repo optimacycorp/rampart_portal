@@ -1,6 +1,7 @@
 import {
   AccessLogEntry,
   DocumentChunk,
+  EvidencePhoto,
   FieldPoint,
   MeetingTranscript,
   Project,
@@ -239,5 +240,40 @@ export const seededMeetingTranscripts: MeetingTranscript[] = [
     created_by_email: "team@rampart-range.org",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
+  }
+];
+
+export const seededEvidencePhotos: EvidencePhoto[] = [
+  {
+    id: "photo-1",
+    project_id: seededProject.id,
+    title: "Gate approach overview",
+    photo_date: "2026-05-06",
+    latitude: 38.9221,
+    longitude: -104.6182,
+    direction_facing: "SE",
+    category: "gate",
+    file_path: null,
+    notes: "Fallback example showing gate approach conditions during access visit.",
+    linked_point_id: "fp-1",
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
+    created_at: new Date().toISOString()
+  },
+  {
+    id: "photo-2",
+    project_id: seededProject.id,
+    title: "Culvert inlet field observation",
+    photo_date: "2026-05-10",
+    latitude: 38.9223,
+    longitude: -104.6184,
+    direction_facing: "N",
+    category: "culvert",
+    file_path: null,
+    notes: "Fallback example tied to the culvert inlet observation point.",
+    linked_point_id: "fp-3",
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
+    created_at: new Date().toISOString()
   }
 ];

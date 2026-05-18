@@ -36,3 +36,16 @@ export const ACCESS_LOG_STATUS_OPTIONS = [
   "Turnout/width",
   "General observation"
 ] as const;
+
+export const PHOTO_CATEGORY_OPTIONS = [
+  "culvert",
+  "berm",
+  "drainage",
+  "road",
+  "gate",
+  "monument",
+  "vegetation",
+  "fire_access",
+  "utility",
+  "general"
+] as const;

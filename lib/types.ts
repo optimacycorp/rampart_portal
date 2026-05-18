@@ -94,6 +94,25 @@ export type MeetingTranscript = {
   updated_at?: string;
 };
 
+export type EvidencePhoto = {
+  id: string;
+  project_id: string;
+  title: string;
+  photo_date?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  easting?: number | null;
+  northing?: number | null;
+  direction_facing?: string | null;
+  category?: string | null;
+  file_path?: string | null;
+  notes?: string | null;
+  linked_point_id?: string | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
+  created_at?: string;
+};
+
 export type FieldPoint = {
   id: string;
   project_id?: string;
