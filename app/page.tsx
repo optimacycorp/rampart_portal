@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectAssistant } from "@/components/ProjectAssistant";
 import { seededFieldPoints, seededProject, seededReviewerComments } from "@/lib/mock-data";
 
 const metrics = [
@@ -43,6 +44,12 @@ export default function DashboardPage() {
         eyebrow="Dashboard"
         title="Evidence portal overview"
         description="Track project evidence in one place so planning, drainage, access, and field coordination work from the same record set."
+      />
+      <ProjectAssistant
+        embedded
+        projectSlug={seededProject.slug}
+        title="Project Analysis"
+        description="Ask status and evidence questions here and get linked, coordination-only answers grounded in project records."
       />
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric) => (
