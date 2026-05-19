@@ -16,6 +16,9 @@ export function DocumentVersionUploadForm({ action }: DocumentVersionUploadFormP
       </label>
       <label className="block">
         <span className="mb-2 block text-sm font-medium text-slate-700">Replacement file</span>
+        <p className="mb-2 text-xs text-slate-500">
+          Large replacement files are supported up to about 100 MB through the app, subject to proxy limits.
+        </p>
         <input
           name="file"
           required

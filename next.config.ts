@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      bodySizeLimit: "25mb"
+      bodySizeLimit: "100mb"
     }
   },
   outputFileTracingRoot: path.join(__dirname)

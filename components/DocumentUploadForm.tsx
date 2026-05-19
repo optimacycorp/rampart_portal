@@ -95,6 +95,10 @@ export function DocumentUploadForm({ action }: DocumentUploadFormProps) {
       </label>
       <label className="block">
         <span className="mb-2 block text-sm font-medium text-slate-700">File upload</span>
+        <p className="mb-2 text-xs text-slate-500">
+          Large documents are supported up to about 100 MB through the app. If the site is proxied through Cloudflare,
+          plan limits can still apply at the edge.
+        </p>
         <input
           name="file"
           required
