@@ -29,7 +29,7 @@ type ReviewerCommentRow = {
   due_date: string | null;
   created_at: string;
   updated_at: string;
-  documents: { title: string } | { title: string }[] | null;
+  linked_document: { title: string } | { title: string }[] | null;
 };
 
 export type ReviewerCommentFilters = {
@@ -69,7 +69,7 @@ export async function getReviewerCommentsByProjectSlug(
   let query = supabase
     .from("reviewer_comments")
     .select(
-      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, page_reference, annotation_type, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, documents(title)"
+      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, page_reference, annotation_type, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, linked_document:documents!reviewer_comments_linked_document_id_fkey(title)"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -118,7 +118,9 @@ export async function getReviewerCommentsByProjectSlug(
     response_text: row.response_text ?? "",
     linked_document_id: row.linked_document_id,
     linked_document_title:
-      Array.isArray(row.documents) ? row.documents[0]?.title ?? undefined : row.documents?.title ?? undefined,
+      Array.isArray(row.linked_document)
+        ? row.linked_document[0]?.title ?? undefined
+        : row.linked_document?.title ?? undefined,
     imported_from_document_id: row.imported_from_document_id,
     due_date: row.due_date,
     created_at: row.created_at,
@@ -137,7 +139,7 @@ export async function getReviewerCommentById(commentId: string): Promise<Reviewe
   const { data, error } = await supabase
     .from("reviewer_comments")
     .select(
-      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, page_reference, annotation_type, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, documents(title)"
+      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, page_reference, annotation_type, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, linked_document:documents!reviewer_comments_linked_document_id_fkey(title)"
     )
     .eq("id", commentId)
     .single();
@@ -166,7 +168,9 @@ export async function getReviewerCommentById(commentId: string): Promise<Reviewe
     response_text: row.response_text ?? "",
     linked_document_id: row.linked_document_id,
     linked_document_title:
-      Array.isArray(row.documents) ? row.documents[0]?.title ?? undefined : row.documents?.title ?? undefined,
+      Array.isArray(row.linked_document)
+        ? row.linked_document[0]?.title ?? undefined
+        : row.linked_document?.title ?? undefined,
     imported_from_document_id: row.imported_from_document_id,
     due_date: row.due_date,
     created_at: row.created_at,
