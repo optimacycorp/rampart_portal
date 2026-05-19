@@ -164,6 +164,7 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<maplibregl.Map | null>(null);
   const hasFittedBoundsRef = useRef(false);
+  const featureCollectionRef = useRef(createFeatureCollection(fieldPoints, []));
   const [basemap, setBasemap] = useState<BasemapMode>("topo3dep");
   const [selectedLayers, setSelectedLayers] = useState<string[]>(() =>
     Array.from(new Set(fieldPoints.map((point) => layerLabels[point.point_type] ?? "Other")))
@@ -178,6 +179,8 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
     () => createFeatureCollection(fieldPoints, selectedLayers),
     [fieldPoints, selectedLayers]
   );
+
+  featureCollectionRef.current = featureCollection;
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) {
@@ -218,15 +221,16 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
     }
 
     const syncMap = () => {
+      const currentFeatureCollection = featureCollectionRef.current;
       const existingSource = map.getSource("field-points") as maplibregl.GeoJSONSource | undefined;
 
       if (!existingSource) {
         map.addSource("field-points", {
           type: "geojson",
-          data: featureCollection
+          data: currentFeatureCollection
         });
       } else {
-        existingSource.setData(featureCollection);
+        existingSource.setData(currentFeatureCollection);
       }
 
       if (!map.getLayer("field-points-circles")) {
@@ -243,29 +247,9 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
         });
       }
 
-      if (!map.getLayer("field-points-labels")) {
-        map.addLayer({
-          id: "field-points-labels",
-          type: "symbol",
-          source: "field-points",
-          layout: {
-            "text-field": ["get", "point_name"],
-            "text-size": 11,
-            "text-offset": [0, 1.25],
-            "text-anchor": "top",
-            "text-allow-overlap": false
-          },
-          paint: {
-            "text-color": "#0f172a",
-            "text-halo-color": "#ffffff",
-            "text-halo-width": 1.2
-          }
-        });
-      }
-
-      if (!hasFittedBoundsRef.current && featureCollection.features.length > 0) {
+      if (!hasFittedBoundsRef.current && currentFeatureCollection.features.length > 0) {
         const bounds = new maplibregl.LngLatBounds();
-        featureCollection.features.forEach((feature) => {
+        currentFeatureCollection.features.forEach((feature) => {
           bounds.extend(feature.geometry.coordinates as [number, number]);
         });
         map.fitBounds(bounds, { padding: 60, maxZoom: 17 });
@@ -308,6 +292,7 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
     };
 
     map.on("style.load", syncMap);
+    map.on("idle", syncMap);
     map.on("click", "field-points-circles", handleClick);
     map.on("mouseenter", "field-points-circles", handleMouseEnter);
     map.on("mouseleave", "field-points-circles", handleMouseLeave);
@@ -318,6 +303,7 @@ export function FieldEvidenceMap({ fieldPoints }: { fieldPoints: FieldPoint[] })
 
     return () => {
       map.off("style.load", syncMap);
+      map.off("idle", syncMap);
       map.off("click", "field-points-circles", handleClick);
       map.off("mouseenter", "field-points-circles", handleMouseEnter);
       map.off("mouseleave", "field-points-circles", handleMouseLeave);
