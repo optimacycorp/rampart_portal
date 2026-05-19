@@ -2,12 +2,14 @@ import Link from "next/link";
 import {
   deleteMeetingTranscript,
   ingestTranscriptForAssistant,
+  transcribeMeetingAudio,
   uploadMeetingTranscript
 } from "@/app/projects/[projectId]/transcripts/actions";
 import { DeleteButton } from "@/components/DeleteButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { MeetingTranscriptUploadForm } from "@/components/MeetingTranscriptUploadForm";
 import { PageHeader } from "@/components/PageHeader";
+import { isAutomaticTranscriptionConfigured } from "@/lib/audio-transcription";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getAssistantIndexStatusByProjectSlug } from "@/lib/document-chunks";
 import { getProjectBySlug } from "@/lib/documents";
@@ -15,8 +17,12 @@ import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
 
 const feedbackText: Record<string, string> = {
   uploaded: "Meeting transcript uploaded.",
+  "uploaded-and-transcribed": "Meeting transcript uploaded and audio was transcribed automatically.",
+  "uploaded-transcription-failed":
+    "Meeting transcript uploaded, but automatic audio transcription failed. The record was still saved.",
   deleted: "Meeting transcript deleted.",
   "assistant-ingested": "Meeting transcript indexed for assistant search.",
+  "audio-transcribed": "Audio was transcribed and the transcript record was updated.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
   "missing-required-fields":
@@ -24,6 +30,10 @@ const feedbackText: Record<string, string> = {
   "storage-upload-failed": "The meeting media file could not be uploaded to storage.",
   "save-failed": "The meeting transcript record could not be saved.",
   "assistant-ingest-failed": "The assistant search index could not be updated for this transcript.",
+  "audio-transcription-failed":
+    "Audio transcription did not complete. Check the transcript record status for details and try again if needed.",
+  "audio-download-failed": "The stored audio file could not be retrieved for transcription.",
+  "no-audio-file": "This meeting record does not have an audio file to transcribe.",
   forbidden: "Only the uploader or an audit user can delete uploaded transcript records.",
   "delete-failed": "The meeting transcript could not be deleted.",
   "transcript-not-found": "The requested transcript record could not be found."
@@ -31,6 +41,36 @@ const feedbackText: Record<string, string> = {
 
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleDateString() : "No date";
+}
+
+function getTranscriptionStatusLabel(status?: string | null) {
+  switch (status) {
+    case "provided":
+      return "Transcript provided";
+    case "auto_transcribed":
+      return "Auto transcribed";
+    case "audio_uploaded":
+      return "Audio uploaded";
+    case "failed":
+      return "Transcription failed";
+    default:
+      return "No transcript";
+  }
+}
+
+function getTranscriptionStatusClasses(status?: string | null) {
+  switch (status) {
+    case "provided":
+      return "bg-emerald-100 text-emerald-700";
+    case "auto_transcribed":
+      return "bg-sky-100 text-sky-700";
+    case "failed":
+      return "bg-rose-100 text-rose-700";
+    case "audio_uploaded":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
 }
 
 export default async function MeetingTranscriptsPage({
@@ -48,6 +88,7 @@ export default async function MeetingTranscriptsPage({
     getMeetingTranscriptsByProjectSlug(projectId),
     getAssistantIndexStatusByProjectSlug(projectId)
   ]);
+  const automaticTranscriptionEnabled = isAutomaticTranscriptionConfigured();
 
   if (!project) {
     return (
@@ -87,6 +128,11 @@ export default async function MeetingTranscriptsPage({
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Add raw audio, a transcript file, pasted transcript text, or any combination of those for a meeting record.
           </p>
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {automaticTranscriptionEnabled
+              ? "Automatic audio transcription is enabled for supported audio uploads up to 25 MB."
+              : "Automatic audio transcription is not configured on this server yet. Audio files can still be stored now and transcribed later."}
+          </div>
           <div className="mt-5">
             <MeetingTranscriptUploadForm action={action} />
           </div>
@@ -140,7 +186,17 @@ export default async function MeetingTranscriptsPage({
                         >
                           {indexed ? "Indexed" : "Needs indexing"}
                         </span>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${getTranscriptionStatusClasses(
+                            transcript.transcription_status
+                          )}`}
+                        >
+                          {getTranscriptionStatusLabel(transcript.transcription_status)}
+                        </span>
                       </div>
+                      {transcript.transcription_error ? (
+                        <p className="text-sm text-rose-700">{transcript.transcription_error}</p>
+                      ) : null}
                       <div className="flex flex-wrap gap-3">
                         {transcript.audio_file_path ? (
                           <Link
@@ -157,6 +213,19 @@ export default async function MeetingTranscriptsPage({
                           >
                             Open transcript file
                           </Link>
+                        ) : null}
+                        {transcript.audio_file_path &&
+                        (transcript.transcription_status === "audio_uploaded" ||
+                          transcript.transcription_status === "failed" ||
+                          !transcript.transcript_text) ? (
+                          <form action={transcribeMeetingAudio.bind(null, projectId, transcript.id)}>
+                            <button
+                              type="submit"
+                              className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
+                            >
+                              {transcript.transcription_status === "failed" ? "Retry transcription" : "Transcribe audio"}
+                            </button>
+                          </form>
                         ) : null}
                         <form action={ingestTranscriptForAssistant.bind(null, projectId, transcript.id)}>
                           <button

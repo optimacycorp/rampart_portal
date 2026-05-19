@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { isAutomaticTranscriptionConfigured, transcribeAudioFile } from "@/lib/audio-transcription";
 import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
 import { ingestTranscriptChunks } from "@/lib/document-chunks";
 import { getProjectBySlug } from "@/lib/documents";
@@ -33,6 +34,27 @@ async function uploadOptionalFile(projectSlug: string, transcriptId: string, fil
   }
 
   return storagePath;
+}
+
+async function buildStoredAudioFile(storagePath: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage.from("meeting-media").download(storagePath);
+
+  if (error || !data) {
+    return null;
+  }
+
+  const fileName = storagePath.split("/").pop() || "meeting-audio";
+  const arrayBuffer = await data.arrayBuffer();
+
+  return new File([arrayBuffer], fileName, {
+    type: data.type || "application/octet-stream"
+  });
 }
 
 export async function uploadMeetingTranscript(projectSlug: string, formData: FormData) {
@@ -72,6 +94,29 @@ export async function uploadMeetingTranscript(projectSlug: string, formData: For
     redirect(`/projects/${projectSlug}/transcripts?error=storage-upload-failed`);
   }
 
+  const extractedTranscriptFileText = await extractTextFromUploadedFile(transcriptFile instanceof File ? transcriptFile : null);
+  let finalTranscriptText = transcriptText || extractedTranscriptFileText || null;
+  let transcriptionStatus = finalTranscriptText ? "provided" : audioFilePath ? "audio_uploaded" : "not_requested";
+  let transcriptionModel: string | null = null;
+  let transcriptionError: string | null = null;
+
+  if (!finalTranscriptText && audioFile instanceof File && audioFile.size > 0) {
+    const transcriptionResult = await transcribeAudioFile(audioFile, {
+      prompt: `Meeting title: ${title}`
+    });
+
+    if (transcriptionResult.ok) {
+      finalTranscriptText = transcriptionResult.text;
+      transcriptionStatus = "auto_transcribed";
+      transcriptionModel = transcriptionResult.model;
+      transcriptionError = null;
+    } else if (isAutomaticTranscriptionConfigured()) {
+      transcriptionStatus = "failed";
+      transcriptionModel = transcriptionResult.model ?? null;
+      transcriptionError = transcriptionResult.reason;
+    }
+  }
+
   const { error } = await supabase.from("meeting_transcripts").insert({
     id: transcriptId,
     project_id: project.id,
@@ -81,7 +126,10 @@ export async function uploadMeetingTranscript(projectSlug: string, formData: For
     source,
     audio_file_path: audioFilePath,
     transcript_file_path: transcriptFilePath,
-    transcript_text: transcriptText,
+    transcript_text: finalTranscriptText,
+    transcription_status: transcriptionStatus,
+    transcription_model: transcriptionModel,
+    transcription_error: transcriptionError,
     notes,
     created_by_user_id: user.id,
     created_by_email: user.email ?? null
@@ -94,19 +142,24 @@ export async function uploadMeetingTranscript(projectSlug: string, formData: For
   }
 
   try {
-    const extractedTranscriptFileText = await extractTextFromUploadedFile(
-      transcriptFile instanceof File ? transcriptFile : null
-    );
     await ingestTranscriptChunks(projectSlug, transcriptId, {
-      extractedText: transcriptText || extractedTranscriptFileText || notes || null,
-      sectionLabel: transcriptText || extractedTranscriptFileText ? `${title} transcript text` : `${title} metadata`
+      extractedText: finalTranscriptText || notes || null,
+      sectionLabel: finalTranscriptText ? `${title} transcript text` : `${title} metadata`
     });
   } catch (ingestError) {
     console.error("Automatic transcript assistant ingest failed", ingestError);
   }
 
   revalidatePath(`/projects/${projectSlug}/transcripts`);
-  redirect(`/projects/${projectSlug}/transcripts?status=uploaded`);
+  redirect(
+    `/projects/${projectSlug}/transcripts?status=${
+      transcriptionStatus === "auto_transcribed"
+        ? "uploaded-and-transcribed"
+        : transcriptionStatus === "failed"
+          ? "uploaded-transcription-failed"
+          : "uploaded"
+    }`
+  );
 }
 
 export async function deleteMeetingTranscript(projectSlug: string, transcriptId: string) {
@@ -153,4 +206,72 @@ export async function ingestTranscriptForAssistant(projectSlug: string, transcri
 
   revalidatePath(`/projects/${projectSlug}/transcripts`);
   redirect(`/projects/${projectSlug}/transcripts?status=assistant-ingested`);
+}
+
+export async function transcribeMeetingAudio(projectSlug: string, transcriptId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/transcripts?error=supabase-not-configured`);
+  }
+
+  const transcript = await getMeetingTranscriptById(transcriptId);
+
+  if (!transcript) {
+    redirect(`/projects/${projectSlug}/transcripts?error=transcript-not-found`);
+  }
+
+  if (!transcript.audio_file_path) {
+    redirect(`/projects/${projectSlug}/transcripts?error=no-audio-file`);
+  }
+
+  const audioFile = await buildStoredAudioFile(transcript.audio_file_path);
+
+  if (!audioFile) {
+    redirect(`/projects/${projectSlug}/transcripts?error=audio-download-failed`);
+  }
+
+  const transcriptionResult = await transcribeAudioFile(audioFile, {
+    prompt: `Meeting title: ${transcript.title}`
+  });
+
+  if (!transcriptionResult.ok) {
+    await supabase
+      .from("meeting_transcripts")
+      .update({
+        transcription_status: isAutomaticTranscriptionConfigured() ? "failed" : "audio_uploaded",
+        transcription_model: transcriptionResult.model ?? null,
+        transcription_error: transcriptionResult.reason
+      })
+      .eq("id", transcript.id);
+
+    revalidatePath(`/projects/${projectSlug}/transcripts`);
+    redirect(`/projects/${projectSlug}/transcripts?error=audio-transcription-failed`);
+  }
+
+  const { error } = await supabase
+    .from("meeting_transcripts")
+    .update({
+      transcript_text: transcriptionResult.text,
+      transcription_status: "auto_transcribed",
+      transcription_model: transcriptionResult.model,
+      transcription_error: null
+    })
+    .eq("id", transcript.id);
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/transcripts?error=save-failed`);
+  }
+
+  try {
+    await ingestTranscriptChunks(projectSlug, transcript.id, {
+      extractedText: transcriptionResult.text,
+      sectionLabel: `${transcript.title} transcript text`
+    });
+  } catch (ingestError) {
+    console.error("Transcript re-ingest failed after auto transcription", ingestError);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/transcripts`);
+  redirect(`/projects/${projectSlug}/transcripts?status=audio-transcribed`);
 }

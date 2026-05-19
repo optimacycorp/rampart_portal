@@ -18,7 +18,7 @@ export async function getMeetingTranscriptsByProjectSlug(projectSlug: string): P
   const { data, error } = await supabase
     .from("meeting_transcripts")
     .select(
-      "id, project_id, title, meeting_date, participants, source, audio_file_path, transcript_file_path, transcript_text, notes, created_by_user_id, created_by_email, created_at, updated_at"
+      "id, project_id, title, meeting_date, participants, source, audio_file_path, transcript_file_path, transcript_text, transcription_status, transcription_model, transcription_error, notes, created_by_user_id, created_by_email, created_at, updated_at"
     )
     .eq("project_id", project.id)
     .order("meeting_date", { ascending: false, nullsFirst: false })
@@ -41,7 +41,7 @@ export async function getMeetingTranscriptById(transcriptId: string): Promise<Me
   const { data, error } = await supabase
     .from("meeting_transcripts")
     .select(
-      "id, project_id, title, meeting_date, participants, source, audio_file_path, transcript_file_path, transcript_text, notes, created_by_user_id, created_by_email, created_at, updated_at"
+      "id, project_id, title, meeting_date, participants, source, audio_file_path, transcript_file_path, transcript_text, transcription_status, transcription_model, transcription_error, notes, created_by_user_id, created_by_email, created_at, updated_at"
     )
     .eq("id", transcriptId)
     .single();

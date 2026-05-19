@@ -45,6 +45,9 @@ export function MeetingTranscriptUploadForm({ action }: MeetingTranscriptUploadF
       </div>
       <label className="block">
         <span className="mb-2 block text-sm font-medium text-slate-700">Audio upload</span>
+        <p className="mb-2 text-xs text-slate-500">
+          Supported for automatic transcription when configured: mp3, m4a, wav, mp4, webm, and similar audio formats.
+        </p>
         <input
           name="audio_file"
           accept="audio/*,.m4a,.mp3,.wav,.mp4"

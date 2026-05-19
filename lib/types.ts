@@ -89,6 +89,9 @@ export type MeetingTranscript = {
   audio_file_path?: string | null;
   transcript_file_path?: string | null;
   transcript_text?: string | null;
+  transcription_status?: string | null;
+  transcription_model?: string | null;
+  transcription_error?: string | null;
   notes?: string | null;
   created_by_user_id?: string | null;
   created_by_email?: string | null;
