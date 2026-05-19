@@ -1,3 +1,4 @@
+import path from "node:path";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 
@@ -39,6 +40,7 @@ export async function extractTextFromUploadedFile(file: File | null | undefined)
   }
 
   if (name.endsWith(".pdf") || type === "application/pdf") {
+    PDFParse.setWorker(path.join(process.cwd(), "node_modules", "pdf-parse", "dist", "pdf-parse", "cjs", "pdf.worker.mjs"));
     const parser = new PDFParse({ data: buffer });
 
     try {
