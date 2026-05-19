@@ -8,6 +8,7 @@ import {
 import { DeleteButton } from "@/components/DeleteButton";
 import { DocumentVersionUploadForm } from "@/components/DocumentVersionUploadForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { FormActionButton } from "@/components/FormActionButton";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getDocumentAssistantIndexStatus } from "@/lib/document-chunks";
@@ -134,20 +135,18 @@ export default async function DocumentDetailPage({
                 </Link>
               ) : null}
               <form action={ingestDocumentForAssistant.bind(null, projectId, document.id)}>
-                <button
-                  type="submit"
-                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Index for assistant
-                </button>
+                <FormActionButton
+                  idleLabel="Index for assistant"
+                  pendingLabel="Indexing..."
+                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-70"
+                />
               </form>
               <form action={reimportDocumentCommentsAndIndex.bind(null, projectId, document.id)}>
-                <button
-                  type="submit"
-                  className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Re-import comments and re-index
-                </button>
+                <FormActionButton
+                  idleLabel="Re-import comments and re-index"
+                  pendingLabel="Re-indexing comments..."
+                  className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-70"
+                />
               </form>
               {canDelete ? (
                 <form action={deleteProjectDocument.bind(null, projectId, document.id)}>
