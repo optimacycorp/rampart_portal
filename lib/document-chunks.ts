@@ -30,7 +30,7 @@ export async function getDocumentChunksByProjectSlug(projectSlug: string): Promi
 
   const { data, error } = await supabase
     .from("document_chunks")
-    .select("id, project_id, document_id, transcript_id, source_type, chunk_text, page_number, section_label, created_at")
+    .select("id, project_id, document_id, transcript_id, source_type, chunk_index, chunk_text, page_number, section_label, created_at")
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
 
@@ -67,11 +67,12 @@ export async function ingestDocumentChunks(
     return { error: "No text available to index for this document." as const };
   }
 
-  const chunks = chunkText(chunkSource).map((chunk) => ({
+  const chunks = chunkText(chunkSource).map((chunk, index) => ({
     project_id: project.id,
     document_id: document.id,
     transcript_id: null,
     source_type: "document" as const,
+    chunk_index: index,
     chunk_text: chunk,
     page_number: options.pageNumber ?? null,
     section_label: options.sectionLabel ?? `${document.title} metadata`
@@ -113,11 +114,12 @@ export async function ingestTranscriptChunks(
     return { error: "No text available to index for this transcript." as const };
   }
 
-  const chunks = chunkText(chunkSource).map((chunk) => ({
+  const chunks = chunkText(chunkSource).map((chunk, index) => ({
     project_id: project.id,
     document_id: null,
     transcript_id: transcript.id,
     source_type: "transcript" as const,
+    chunk_index: index,
     chunk_text: chunk,
     page_number: null,
     section_label: options.sectionLabel ?? `${transcript.title} transcript`

@@ -78,6 +78,7 @@ export type DocumentChunk = {
   document_id?: string | null;
   transcript_id?: string | null;
   source_type: "document" | "transcript";
+  chunk_index?: number | null;
   chunk_text: string;
   page_number?: number | null;
   section_label?: string | null;
