@@ -343,30 +343,58 @@ export async function reimportDocumentCommentsAndIndex(projectSlug: string, docu
     type: data.type || "application/octet-stream"
   });
 
+  let extractedText: string | null = null;
+
   try {
-    const extractedText = await extractTextFromUploadedFile(downloadedFile);
-    const ingestResult = await ingestDocumentChunks(projectSlug, documentId, {
-      extractedText,
-      sectionLabel: extractedText ? `${document.title} uploaded text` : `${document.title} metadata`
-    });
-    if ("error" in ingestResult) {
-      throw new Error(ingestResult.error);
+    extractedText = await extractTextFromUploadedFile(downloadedFile);
+  } catch (extractionError) {
+    console.error("Document text extraction failed during re-import", extractionError);
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-text-extraction-failed`);
+  }
+
+  const ingestResult = await ingestDocumentChunks(projectSlug, documentId, {
+    extractedText,
+    sectionLabel: extractedText ? `${document.title} uploaded text` : `${document.title} metadata`
+  });
+
+  const commentImportResult = await (async () => {
+    try {
+      return await syncImportedReviewerCommentsFromDocument({
+        projectSlug,
+        documentId,
+        createdByUserId: document.created_by_user_id ?? null,
+        createdByEmail: document.created_by_email ?? null,
+        extractedText
+      });
+    } catch (commentImportError) {
+      console.error("Document comment re-import failed", commentImportError);
+      return { error: "comment-import-failed" as const };
+    }
+  })();
+
+  if ("error" in ingestResult) {
+    console.error("Document assistant re-index failed", ingestResult.error);
+
+    if (!("error" in commentImportResult) && commentImportResult.importedCount > 0) {
+      revalidatePath(`/projects/${projectSlug}/documents`);
+      revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+      revalidatePath(`/projects/${projectSlug}/comments`);
+      redirect(`/projects/${projectSlug}/documents/${documentId}?status=comments-reimported-index-failed`);
     }
 
-    await syncImportedReviewerCommentsFromDocument({
-      projectSlug,
-      documentId,
-      createdByUserId: document.created_by_user_id ?? null,
-      createdByEmail: document.created_by_email ?? null,
-      extractedText
-    });
-  } catch (ingestError) {
-    console.error("Document re-import and re-index failed", ingestError);
     redirect(`/projects/${projectSlug}/documents/${documentId}?error=assistant-ingest-failed`);
+  }
+
+  if ("error" in commentImportResult) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=comment-import-failed`);
   }
 
   revalidatePath(`/projects/${projectSlug}/documents`);
   revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
   revalidatePath(`/projects/${projectSlug}/comments`);
-  redirect(`/projects/${projectSlug}/documents/${documentId}?status=reimported-and-indexed`);
+  redirect(
+    `/projects/${projectSlug}/documents/${documentId}?status=${
+      commentImportResult.importedCount > 0 ? "reimported-comments-and-indexed" : "reimported-and-indexed"
+    }`
+  );
 }

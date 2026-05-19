@@ -64,9 +64,17 @@ export default async function DocumentDetailPage({
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           Document metadata and notes were indexed for assistant search.
         </div>
+      ) : query.status === "reimported-comments-and-indexed" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          Document text was re-indexed and reviewer comments were imported from the current file.
+        </div>
       ) : query.status === "reimported-and-indexed" ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          Document text was re-indexed and any importable reviewer comments were refreshed from the current file.
+          Document text was re-indexed. No importable reviewer comments were found in the current file.
+        </div>
+      ) : query.status === "comments-reimported-index-failed" ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Reviewer comments were imported from the current file, but the assistant search index could not be refreshed.
         </div>
       ) : null}
       {query.error ? (
@@ -81,8 +89,10 @@ export default async function DocumentDetailPage({
                   ? "Only the uploader or an audit user can delete uploaded records."
                   : query.error === "comment-import-failed"
                     ? "The file is saved, but reviewer comments could not be imported. Confirm the latest reviewer_comments migrations are applied, then try the re-import action again."
+                  : query.error === "document-text-extraction-failed"
+                    ? "The stored file could not be read for text extraction, so comments and assistant indexing could not be refreshed."
                   : query.error === "assistant-ingest-failed"
-                    ? "The assistant search index could not be updated for this document."
+                    ? "The assistant search index could not be updated for this document. If this is a merged review PDF, comment import may still succeed on the next retry."
                     : "The requested document action could not be completed."}
         </div>
       ) : null}
