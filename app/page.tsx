@@ -2,42 +2,51 @@ import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssistant } from "@/components/ProjectAssistant";
+import { getAssistantIndexStatusByProjectSlug } from "@/lib/document-chunks";
+import { getDocumentsByProjectSlug } from "@/lib/documents";
+import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
 import { seededFieldPoints, seededProject, seededReviewerComments } from "@/lib/mock-data";
 
-const metrics = [
-  {
-    label: "Open reviewer comments",
-    value: `${seededReviewerComments.filter((item) => item.status !== "resolved").length}`,
-    hint: "Current active coordination items"
-  },
-  {
-    label: "Critical comments",
-    value: `${seededReviewerComments.filter((item) => item.priority === "critical").length}`,
-    hint: "Highest priority follow-up"
-  },
-  {
-    label: "Documents uploaded",
-    value: "12",
-    hint: "Placeholder count until Supabase documents are connected"
-  },
-  {
-    label: "Field points collected",
-    value: `${seededFieldPoints.length}`,
-    hint: "Seeded Emlid-ready examples"
-  },
-  {
-    label: "Culverts logged",
-    value: "1",
-    hint: "Register route prepared for Sprint 1"
-  },
-  {
-    label: "Access log entries",
-    value: "4",
-    hint: "Initial route scaffold for road and gate observations"
-  }
-];
+export default async function DashboardPage() {
+  const [documents, transcripts, assistantIndex] = await Promise.all([
+    getDocumentsByProjectSlug(seededProject.slug),
+    getMeetingTranscriptsByProjectSlug(seededProject.slug),
+    getAssistantIndexStatusByProjectSlug(seededProject.slug)
+  ]);
 
-export default function DashboardPage() {
+  const metrics = [
+    {
+      label: "Open reviewer comments",
+      value: `${seededReviewerComments.filter((item) => item.status !== "resolved").length}`,
+      hint: "Current active coordination items"
+    },
+    {
+      label: "Critical comments",
+      value: `${seededReviewerComments.filter((item) => item.priority === "critical").length}`,
+      hint: "Highest priority follow-up"
+    },
+    {
+      label: "Documents uploaded",
+      value: `${documents.length || 12}`,
+      hint: "Current project document records"
+    },
+    {
+      label: "Field points collected",
+      value: `${seededFieldPoints.length}`,
+      hint: "Seeded Emlid-ready examples"
+    },
+    {
+      label: "Indexed records",
+      value: `${assistantIndex.indexedDocumentIds.size + assistantIndex.indexedTranscriptIds.size}`,
+      hint: "Documents and transcripts searchable by the assistant"
+    },
+    {
+      label: "Needs indexing",
+      value: `${Math.max(documents.length - assistantIndex.indexedDocumentIds.size, 0) + Math.max(transcripts.length - assistantIndex.indexedTranscriptIds.size, 0)}`,
+      hint: "Records still missing assistant search coverage"
+    }
+  ];
+
   return (
     <div className="space-y-8">
       <PageHeader

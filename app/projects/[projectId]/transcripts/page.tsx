@@ -9,8 +9,9 @@ import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { MeetingTranscriptUploadForm } from "@/components/MeetingTranscriptUploadForm";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
+import { getAssistantIndexStatusByProjectSlug } from "@/lib/document-chunks";
 import { getProjectBySlug } from "@/lib/documents";
+import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
 
 const feedbackText: Record<string, string> = {
   uploaded: "Meeting transcript uploaded.",
@@ -41,10 +42,11 @@ export default async function MeetingTranscriptsPage({
 }) {
   const { projectId } = await params;
   const query = await searchParams;
-  const [{ user, role }, project, transcripts] = await Promise.all([
+  const [{ user, role }, project, transcripts, assistantIndex] = await Promise.all([
     getCurrentUserContext(),
     getProjectBySlug(projectId),
-    getMeetingTranscriptsByProjectSlug(projectId)
+    getMeetingTranscriptsByProjectSlug(projectId),
+    getAssistantIndexStatusByProjectSlug(projectId)
   ]);
 
   if (!project) {
@@ -105,6 +107,7 @@ export default async function MeetingTranscriptsPage({
             ) : null}
             {transcripts.map((transcript) => {
               const canDelete = role === "audit" || (Boolean(user) && transcript.created_by_user_id === user?.id);
+              const indexed = assistantIndex.indexedTranscriptIds.has(transcript.id);
 
               return (
                 <div key={transcript.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -129,6 +132,15 @@ export default async function MeetingTranscriptsPage({
                             : transcript.transcript_text}
                         </div>
                       ) : null}
+                      <div className="flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
+                            indexed ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {indexed ? "Indexed" : "Needs indexing"}
+                        </span>
+                      </div>
                       <div className="flex flex-wrap gap-3">
                         {transcript.audio_file_path ? (
                           <Link

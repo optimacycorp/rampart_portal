@@ -6,6 +6,7 @@ import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
+import { getAssistantIndexStatusByProjectSlug } from "@/lib/document-chunks";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
@@ -38,10 +39,11 @@ export default async function DocumentsPage({
 }) {
   const { projectId } = await params;
   const query = await searchParams;
-  const [{ user, role }, project, documents] = await Promise.all([
+  const [{ user, role }, project, documents, assistantIndex] = await Promise.all([
     getCurrentUserContext(),
     getProjectBySlug(projectId),
-    getDocumentsByProjectSlug(projectId)
+    getDocumentsByProjectSlug(projectId),
+    getAssistantIndexStatusByProjectSlug(projectId)
   ]);
   const supabaseConfigured = Boolean(getSupabaseAdminClient());
   const activeType = DOCUMENT_TYPE_OPTIONS.includes((query.type ?? "") as (typeof DOCUMENT_TYPE_OPTIONS)[number])
@@ -143,6 +145,7 @@ export default async function DocumentsPage({
             ) : null}
             {filteredDocuments.map((document) => {
               const canDelete = role === "audit" || (Boolean(user) && document.created_by_user_id === user?.id);
+              const indexed = assistantIndex.indexedDocumentIds.has(document.id);
 
               return (
                 <div key={document.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -150,10 +153,10 @@ export default async function DocumentsPage({
                     <Link href={`/projects/${projectId}/documents/${document.id}`} className="block flex-1 space-y-2">
                       <p className="font-medium text-slate-800">{document.title}</p>
                       <p className="text-sm text-slate-500">
-                        {document.document_type} • {document.source_agency ?? "Source pending"}
+                        {document.document_type} | {document.source_agency ?? "Source pending"}
                       </p>
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        {formatDate(document.record_date)} • {document.file_path ? "File attached" : "Metadata only"} •
+                        {formatDate(document.record_date)} | {document.file_path ? "File attached" : "Metadata only"} |
                         <span className="ml-1">v{document.current_version_number}</span>
                       </p>
                       <p className="text-xs text-slate-500">
@@ -162,6 +165,13 @@ export default async function DocumentsPage({
                       </p>
                     </Link>
                     <div className="flex items-center gap-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
+                          indexed ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {indexed ? "Indexed" : "Needs indexing"}
+                      </span>
                       <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
                         {document.status}
                       </span>

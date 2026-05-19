@@ -159,3 +159,17 @@ export async function searchDocumentChunksByProjectSlug(projectSlug: string, que
 
   return ranked.slice(0, limit).map((entry) => entry.chunk);
 }
+
+export async function getAssistantIndexStatusByProjectSlug(projectSlug: string) {
+  const chunks = await getDocumentChunksByProjectSlug(projectSlug);
+
+  return {
+    chunkCount: chunks.length,
+    indexedDocumentIds: new Set(
+      chunks.filter((chunk) => chunk.source_type === "document" && chunk.document_id).map((chunk) => chunk.document_id as string)
+    ),
+    indexedTranscriptIds: new Set(
+      chunks.filter((chunk) => chunk.source_type === "transcript" && chunk.transcript_id).map((chunk) => chunk.transcript_id as string)
+    )
+  };
+}
