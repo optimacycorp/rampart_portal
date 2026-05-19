@@ -6,6 +6,7 @@ import {
 import { DeleteButton } from "@/components/DeleteButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { ReviewerCommentPreview } from "@/components/ReviewerCommentPreview";
 import { ReviewerCommentForm } from "@/components/ReviewerCommentForm";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
@@ -218,30 +219,41 @@ export default async function CommentsPage({
                   ? `&applicationNumberFilter=${encodeURIComponent(query.applicationNumberFilter)}`
                   : "");
 
+              const pageType = [comment.page_reference, comment.annotation_type].filter(Boolean).join(" | ") || "Unspecified";
+
               return (
-                <a
+                <div
                   key={comment.id}
-                  href={editHref}
                   className={`grid grid-cols-[0.9fr_1fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 px-5 py-4 text-sm transition ${
                     activeComment?.id === comment.id ? "bg-emerald-50/70" : "hover:bg-slate-50"
                   }`}
                 >
-                  <span className="font-medium text-slate-800">{comment.comment_id}</span>
+                  <a href={editHref} className="font-medium text-pine transition hover:text-emerald-800 hover:underline">
+                    {comment.comment_id}
+                  </a>
                   <span className="text-slate-600">{comment.application_number}</span>
-                  <span className="text-slate-600">
-                    {[comment.page_reference, comment.annotation_type].filter(Boolean).join(" | ") || "Unspecified"}
-                  </span>
+                  <span className="text-slate-600">{pageType}</span>
                   <span className="text-slate-600">{comment.reviewer_name}</span>
                   <span className="text-slate-600">{comment.department}</span>
                   <span className="text-slate-600">{comment.priority}</span>
                   <span className="text-slate-600">{comment.status}</span>
                   <span className="text-slate-600">{comment.responsible_party}</span>
-                  <span className="text-slate-700">{comment.comment_text}</span>
+                  <ReviewerCommentPreview
+                    commentId={comment.comment_id}
+                    applicationNumber={comment.application_number}
+                    reviewerName={comment.reviewer_name}
+                    department={comment.department}
+                    status={comment.status}
+                    responsibleParty={comment.responsible_party}
+                    pageType={pageType}
+                    commentText={comment.comment_text}
+                    responseText={comment.response_text}
+                  />
                   <span className="text-slate-600">{comment.linked_document_title ?? "Unlinked"}</span>
                   <span className="text-slate-600">
                     {comment.imported_from_document_id ? "Imported" : "Manual"}
                   </span>
-                </a>
+                </div>
               );
             })}
           </div>
