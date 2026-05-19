@@ -16,6 +16,8 @@ export type ReviewerComment = {
   created_by_email?: string | null;
   application_number: string;
   comment_id: string;
+  page_reference?: string | null;
+  annotation_type?: string | null;
   reviewer_name: string;
   department: string;
   priority: "low" | "medium" | "high" | "critical";

@@ -6,6 +6,7 @@ import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-s
 import { PHOTO_CATEGORY_OPTIONS } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
 import { getEvidencePhotoById } from "@/lib/evidence-photos";
+import { extractPhotoMetadata } from "@/lib/media-metadata";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
@@ -49,6 +50,10 @@ export async function uploadEvidencePhoto(projectSlug: string, formData: FormDat
   }
 
   const mediaKind = file.type.startsWith("video/") ? "video" : "photo";
+  const extractedPhotoMetadata = mediaKind === "photo" ? await extractPhotoMetadata(file) : null;
+  const manualPhotoDate = `${formData.get("photo_date") ?? ""}`.trim() || null;
+  const manualLatitude = parseOptionalNumber(formData.get("latitude"));
+  const manualLongitude = parseOptionalNumber(formData.get("longitude"));
 
   const photoId = crypto.randomUUID();
   const storagePath = `${project.slug}/photos/${photoId}-${Date.now()}-${sanitizeFileName(file.name)}`;
@@ -69,9 +74,9 @@ export async function uploadEvidencePhoto(projectSlug: string, formData: FormDat
     title,
     media_kind: mediaKind,
     mime_type: file.type || null,
-    photo_date: `${formData.get("photo_date") ?? ""}`.trim() || null,
-    latitude: parseOptionalNumber(formData.get("latitude")),
-    longitude: parseOptionalNumber(formData.get("longitude")),
+    photo_date: manualPhotoDate ?? extractedPhotoMetadata?.photoDate ?? null,
+    latitude: manualLatitude ?? extractedPhotoMetadata?.latitude ?? null,
+    longitude: manualLongitude ?? extractedPhotoMetadata?.longitude ?? null,
     easting: parseOptionalNumber(formData.get("easting")),
     northing: parseOptionalNumber(formData.get("northing")),
     direction_facing: `${formData.get("direction_facing") ?? ""}`.trim() || null,

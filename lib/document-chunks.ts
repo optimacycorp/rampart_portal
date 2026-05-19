@@ -173,3 +173,36 @@ export async function getAssistantIndexStatusByProjectSlug(projectSlug: string) 
     )
   };
 }
+
+export async function getDocumentAssistantIndexStatus(documentId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return {
+      indexed: false,
+      chunkCount: 0,
+      lastIndexedAt: null as string | null
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("document_chunks")
+    .select("id, created_at")
+    .eq("document_id", documentId)
+    .eq("source_type", "document")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return {
+      indexed: false,
+      chunkCount: 0,
+      lastIndexedAt: null as string | null
+    };
+  }
+
+  return {
+    indexed: data.length > 0,
+    chunkCount: data.length,
+    lastIndexedAt: data[0]?.created_at ?? null
+  };
+}

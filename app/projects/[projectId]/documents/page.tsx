@@ -12,6 +12,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase";
 
 const feedbackText: Record<string, string> = {
   uploaded: "Document uploaded and saved to the project record.",
+  "uploaded-comments-imported": "Document uploaded and reviewer comments were imported from the merged report.",
   "version-uploaded": "New document version uploaded and prior version preserved.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
@@ -20,6 +21,8 @@ const feedbackText: Record<string, string> = {
   "storage-upload-failed": "The file could not be uploaded to the project-documents bucket.",
   "document-save-failed": "The document record could not be saved after upload.",
   "document-version-save-failed": "The document version history could not be updated.",
+  "comment-import-failed":
+    "The document uploaded, but reviewer comments could not be imported. Confirm the latest reviewer_comments migrations are applied, then use the document detail page to re-import comments and re-index.",
   deleted: "Document upload deleted.",
   forbidden: "Only the uploader or an audit user can delete uploaded records.",
   "document-delete-failed": "The document could not be deleted.",

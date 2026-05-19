@@ -108,6 +108,7 @@ export function PhotoEvidenceUploadForm({ action, fieldPoints }: PhotoEvidenceUp
         <span className="mb-2 block text-sm font-medium text-slate-700">Photo or video upload</span>
         <p className="mb-2 text-xs text-slate-500">
           Images and field videos are both supported here and will be stored in the same evidence library.
+          Photo uploads will try to read embedded EXIF date and GPS automatically if those fields are left blank.
         </p>
         <input
           name="file"

@@ -188,9 +188,10 @@ export default async function CommentsPage({
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-card">
-          <div className="grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="grid grid-cols-[0.9fr_1fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             <span>Comment ID</span>
             <span>Application No.</span>
+            <span>Page / Type</span>
             <span>Reviewer</span>
             <span>Department</span>
             <span>Priority</span>
@@ -221,12 +222,15 @@ export default async function CommentsPage({
                 <a
                   key={comment.id}
                   href={editHref}
-                  className={`grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 px-5 py-4 text-sm transition ${
+                  className={`grid grid-cols-[0.9fr_1fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 px-5 py-4 text-sm transition ${
                     activeComment?.id === comment.id ? "bg-emerald-50/70" : "hover:bg-slate-50"
                   }`}
                 >
                   <span className="font-medium text-slate-800">{comment.comment_id}</span>
                   <span className="text-slate-600">{comment.application_number}</span>
+                  <span className="text-slate-600">
+                    {[comment.page_reference, comment.annotation_type].filter(Boolean).join(" | ") || "Unspecified"}
+                  </span>
                   <span className="text-slate-600">{comment.reviewer_name}</span>
                   <span className="text-slate-600">{comment.department}</span>
                   <span className="text-slate-600">{comment.priority}</span>

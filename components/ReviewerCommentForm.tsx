@@ -60,6 +60,26 @@ export function ReviewerCommentForm({
           />
         </label>
         <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Page reference</span>
+          <input
+            name="page_reference"
+            defaultValue={comment?.page_reference ?? ""}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+            type="text"
+            placeholder="1"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Annotation type</span>
+          <input
+            name="annotation_type"
+            defaultValue={comment?.annotation_type ?? ""}
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+            type="text"
+            placeholder="Note, Callout, Link"
+          />
+        </label>
+        <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Department</span>
           <input
             name="department"

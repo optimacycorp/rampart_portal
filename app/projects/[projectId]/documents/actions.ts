@@ -108,23 +108,34 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
 
   try {
     const extractedText = await extractTextFromUploadedFile(file);
-    await ingestDocumentChunks(projectSlug, documentInsert.id, {
+    const ingestResult = await ingestDocumentChunks(projectSlug, documentInsert.id, {
       extractedText,
       sectionLabel: extractedText ? `${title} uploaded text` : `${title} metadata`
     });
-    await syncImportedReviewerCommentsFromDocument({
+    if ("error" in ingestResult) {
+      console.error("Automatic document assistant ingest failed", ingestResult.error);
+    }
+
+    const importResult = await syncImportedReviewerCommentsFromDocument({
       projectSlug,
       documentId: documentInsert.id,
       createdByUserId: user.id,
       createdByEmail: user.email ?? null,
       extractedText
     });
-  } catch (error) {
-    console.error("Automatic document assistant ingest failed", error);
-  }
 
-  revalidatePath(`/projects/${projectSlug}/documents`);
-  redirect(`/projects/${projectSlug}/documents?status=uploaded`);
+    revalidatePath(`/projects/${projectSlug}/comments`);
+    revalidatePath(`/projects/${projectSlug}/documents`);
+    redirect(
+      `/projects/${projectSlug}/documents?status=${
+        importResult.importedCount > 0 ? "uploaded-comments-imported" : "uploaded"
+      }`
+    );
+  } catch (error) {
+    console.error("Automatic document assistant ingest or comment import failed", error);
+    revalidatePath(`/projects/${projectSlug}/documents`);
+    redirect(`/projects/${projectSlug}/documents?error=comment-import-failed`);
+  }
 }
 
 export async function uploadDocumentVersion(projectSlug: string, documentId: string, formData: FormData) {
@@ -214,24 +225,35 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
 
   try {
     const extractedText = await extractTextFromUploadedFile(file);
-    await ingestDocumentChunks(projectSlug, documentId, {
+    const ingestResult = await ingestDocumentChunks(projectSlug, documentId, {
       extractedText: extractedText || versionNotes || null,
       sectionLabel: extractedText ? `${document.title} version ${nextVersionNumber} text` : `${document.title} metadata`
     });
-    await syncImportedReviewerCommentsFromDocument({
+    if ("error" in ingestResult) {
+      console.error("Automatic document version assistant ingest failed", ingestResult.error);
+    }
+
+    const importResult = await syncImportedReviewerCommentsFromDocument({
       projectSlug,
       documentId,
       createdByUserId: user.id,
       createdByEmail: user.email ?? null,
       extractedText
     });
-  } catch (error) {
-    console.error("Automatic document version assistant ingest failed", error);
-  }
 
-  revalidatePath(`/projects/${projectSlug}/documents`);
-  revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
-  redirect(`/projects/${projectSlug}/documents/${documentId}?status=version-uploaded`);
+    revalidatePath(`/projects/${projectSlug}/comments`);
+    revalidatePath(`/projects/${projectSlug}/documents`);
+    revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+    redirect(
+      `/projects/${projectSlug}/documents/${documentId}?status=${
+        importResult.importedCount > 0 ? "version-uploaded-comments-imported" : "version-uploaded"
+      }`
+    );
+  } catch (error) {
+    console.error("Automatic document version ingest or comment import failed", error);
+    revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=comment-import-failed`);
+  }
 }
 
 export async function deleteProjectDocument(projectSlug: string, documentId: string) {
@@ -288,4 +310,63 @@ export async function ingestDocumentForAssistant(projectSlug: string, documentId
 
   revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
   redirect(`/projects/${projectSlug}/documents/${documentId}?status=assistant-ingested`);
+}
+
+export async function reimportDocumentCommentsAndIndex(projectSlug: string, documentId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=supabase-not-configured`);
+  }
+
+  const [document, versions] = await Promise.all([getDocumentById(documentId), getDocumentVersions(documentId)]);
+
+  if (!document) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=document-not-found`);
+  }
+
+  const currentVersion = versions.find((version) => version.is_current) ?? versions[0];
+  const filePath = currentVersion?.file_path ?? document.file_path;
+
+  if (!filePath) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=file-required`);
+  }
+
+  const { data, error } = await supabase.storage.from("project-documents").download(filePath);
+
+  if (error || !data) {
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=storage-upload-failed`);
+  }
+
+  const fileName = filePath.split("/").pop() || `${document.title}.pdf`;
+  const downloadedFile = new File([await data.arrayBuffer()], fileName, {
+    type: data.type || "application/octet-stream"
+  });
+
+  try {
+    const extractedText = await extractTextFromUploadedFile(downloadedFile);
+    const ingestResult = await ingestDocumentChunks(projectSlug, documentId, {
+      extractedText,
+      sectionLabel: extractedText ? `${document.title} uploaded text` : `${document.title} metadata`
+    });
+    if ("error" in ingestResult) {
+      throw new Error(ingestResult.error);
+    }
+
+    await syncImportedReviewerCommentsFromDocument({
+      projectSlug,
+      documentId,
+      createdByUserId: document.created_by_user_id ?? null,
+      createdByEmail: document.created_by_email ?? null,
+      extractedText
+    });
+  } catch (ingestError) {
+    console.error("Document re-import and re-index failed", ingestError);
+    redirect(`/projects/${projectSlug}/documents/${documentId}?error=assistant-ingest-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/documents`);
+  revalidatePath(`/projects/${projectSlug}/documents/${documentId}`);
+  revalidatePath(`/projects/${projectSlug}/comments`);
+  redirect(`/projects/${projectSlug}/documents/${documentId}?status=reimported-and-indexed`);
 }

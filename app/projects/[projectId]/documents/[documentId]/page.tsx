@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   deleteProjectDocument,
   ingestDocumentForAssistant,
+  reimportDocumentCommentsAndIndex,
   uploadDocumentVersion
 } from "@/app/projects/[projectId]/documents/actions";
 import { DeleteButton } from "@/components/DeleteButton";
@@ -9,6 +10,7 @@ import { DocumentVersionUploadForm } from "@/components/DocumentVersionUploadFor
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { getDocumentAssistantIndexStatus } from "@/lib/document-chunks";
 import { getDocumentById, getDocumentVersions } from "@/lib/documents";
 
 export default async function DocumentDetailPage({
@@ -20,10 +22,11 @@ export default async function DocumentDetailPage({
 }) {
   const { projectId, documentId } = await params;
   const query = await searchParams;
-  const [{ user, role }, document, versions] = await Promise.all([
+  const [{ user, role }, document, versions, indexStatus] = await Promise.all([
     getCurrentUserContext(),
     getDocumentById(documentId),
-    getDocumentVersions(documentId)
+    getDocumentVersions(documentId),
+    getDocumentAssistantIndexStatus(documentId)
   ]);
 
   if (!document) {
@@ -53,9 +56,17 @@ export default async function DocumentDetailPage({
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           New document version uploaded and prior versions preserved in history.
         </div>
+      ) : query.status === "version-uploaded-comments-imported" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          New document version uploaded, prior versions preserved, and reviewer comments were refreshed from the current file.
+        </div>
       ) : query.status === "assistant-ingested" ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           Document metadata and notes were indexed for assistant search.
+        </div>
+      ) : query.status === "reimported-and-indexed" ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          Document text was re-indexed and any importable reviewer comments were refreshed from the current file.
         </div>
       ) : null}
       {query.error ? (
@@ -68,6 +79,8 @@ export default async function DocumentDetailPage({
                 ? "Please choose a replacement file."
                 : query.error === "forbidden"
                   ? "Only the uploader or an audit user can delete uploaded records."
+                  : query.error === "comment-import-failed"
+                    ? "The file is saved, but reviewer comments could not be imported. Confirm the latest reviewer_comments migrations are applied, then try the re-import action again."
                   : query.error === "assistant-ingest-failed"
                     ? "The assistant search index could not be updated for this document."
                     : "The requested document action could not be completed."}
@@ -75,7 +88,7 @@ export default async function DocumentDetailPage({
       ) : null}
       <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
         <div className="grid gap-4 md:grid-cols-2">
-          {[
+          {[ 
             `Document type: ${document.document_type}`,
             `Record date: ${document.record_date ?? "pending"}`,
             `Reception number: ${document.reception_number ?? "pending"}`,
@@ -83,7 +96,9 @@ export default async function DocumentDetailPage({
             `Source agency: ${document.source_agency ?? "pending"}`,
             `Status: ${document.status}`,
             `Current version: v${document.current_version_number}`,
-            `Uploaded by: ${document.created_by_email ?? "Unknown"}`
+            `Uploaded by: ${document.created_by_email ?? "Unknown"}`,
+            `Assistant index: ${indexStatus.indexed ? `Indexed (${indexStatus.chunkCount} chunks)` : "Needs indexing"}`,
+            `Last indexed: ${indexStatus.lastIndexedAt ? new Date(indexStatus.lastIndexedAt).toLocaleString() : "Not indexed yet"}`
           ].map((item) => (
             <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
               {item}
@@ -114,6 +129,14 @@ export default async function DocumentDetailPage({
                   className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
                 >
                   Index for assistant
+                </button>
+              </form>
+              <form action={reimportDocumentCommentsAndIndex.bind(null, projectId, document.id)}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Re-import comments and re-index
                 </button>
               </form>
               {canDelete ? (

@@ -29,6 +29,8 @@ export async function createReviewerComment(projectSlug: string, formData: FormD
     project_id: project.id,
     application_number: readValue(formData, "application_number"),
     comment_id: readValue(formData, "comment_id"),
+    page_reference: readValue(formData, "page_reference") || null,
+    annotation_type: readValue(formData, "annotation_type") || null,
     reviewer_name: readValue(formData, "reviewer_name"),
     department: readValue(formData, "department"),
     priority: readValue(formData, "priority") || "medium",
@@ -66,6 +68,8 @@ export async function updateReviewerComment(projectSlug: string, commentId: stri
   const payload = {
     application_number: readValue(formData, "application_number"),
     comment_id: readValue(formData, "comment_id"),
+    page_reference: readValue(formData, "page_reference") || null,
+    annotation_type: readValue(formData, "annotation_type") || null,
     reviewer_name: readValue(formData, "reviewer_name"),
     department: readValue(formData, "department"),
     priority: readValue(formData, "priority") || "medium",

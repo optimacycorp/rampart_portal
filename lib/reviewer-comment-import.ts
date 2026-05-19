@@ -4,6 +4,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase";
 type ParsedReviewerComment = {
   application_number: string;
   comment_id: string;
+  page_reference: string | null;
+  annotation_type: string | null;
   reviewer_name: string;
   department: string;
   status: string;
@@ -11,7 +13,7 @@ type ParsedReviewerComment = {
 };
 
 const STATUS_PATTERN = /^(Open|Resolved|Closed|Deferred|In Progress|In Review)\b\s*(.*)$/i;
-const COMMENT_START_PATTERN = /^(\d+)\s+\d+\s+(Note|Callout|Link)\s+(.+?)\s:\s(.+)$/i;
+const COMMENT_START_PATTERN = /^(\d+)\s+(\d+)\s+(Note|Callout|Link)\s+(.+?)\s:\s(.+)$/i;
 const SINGLE_LINE_COMMENT_PATTERN = /^(\d+)\s+(.+?)\s:\s(.+?)\s(Open|Resolved|Closed|Deferred|In Progress|In Review)\b\s*(.*)$/i;
 const APPLICATION_PATTERN = /Application No\.\s*([A-Z0-9-]+)/i;
 
@@ -181,6 +183,8 @@ export function parseMergedReviewerComments(extractedText: string | null | undef
         parsed.push({
           application_number: applicationNumber,
           comment_id: commentId,
+          page_reference: null,
+          annotation_type: null,
           reviewer_name: normalizeCommentText(reviewerName),
           department: normalizeDepartment(department),
           status: normalizeStatus(rawStatus),
@@ -198,7 +202,7 @@ export function parseMergedReviewerComments(extractedText: string | null | undef
       continue;
     }
 
-    const [, commentId, , reviewerName, firstDepartmentLine] = commentStartMatch;
+    const [, commentId, pageReference, annotationType, reviewerName, firstDepartmentLine] = commentStartMatch;
     const departmentParts = [firstDepartmentLine];
     let status = "open";
     const textParts: string[] = [];
@@ -250,12 +254,14 @@ export function parseMergedReviewerComments(extractedText: string | null | undef
     const commentText = normalizeCommentText(textParts.join(" "));
 
     if (commentText) {
-      parsed.push({
-        application_number: applicationNumber,
-        comment_id: commentId,
-        reviewer_name: normalizeCommentText(reviewerName),
-        department: normalizeDepartment(departmentParts.join(" ")),
-        status,
+        parsed.push({
+          application_number: applicationNumber,
+          comment_id: commentId,
+          page_reference: pageReference,
+          annotation_type: annotationType,
+          reviewer_name: normalizeCommentText(reviewerName),
+          department: normalizeDepartment(departmentParts.join(" ")),
+          status,
         comment_text: commentText
       });
     }
@@ -302,6 +308,8 @@ export async function syncImportedReviewerCommentsFromDocument(options: {
     project_id: project.id,
     application_number: comment.application_number,
     comment_id: comment.comment_id,
+    page_reference: comment.page_reference,
+    annotation_type: comment.annotation_type,
     reviewer_name: comment.reviewer_name,
     department: comment.department,
     status: comment.status,
