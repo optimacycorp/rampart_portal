@@ -11,6 +11,8 @@ import { ReviewerComment } from "@/lib/types";
 type ReviewerCommentRow = {
   id: string;
   project_id: string;
+  created_by_user_id: string | null;
+  created_by_email: string | null;
   application_number: string | null;
   comment_id: string | null;
   reviewer_name: string | null;
@@ -21,6 +23,7 @@ type ReviewerCommentRow = {
   response_text: string | null;
   responsible_party: string | null;
   linked_document_id: string | null;
+  imported_from_document_id: string | null;
   due_date: string | null;
   created_at: string;
   updated_at: string;
@@ -64,7 +67,7 @@ export async function getReviewerCommentsByProjectSlug(
   let query = supabase
     .from("reviewer_comments")
     .select(
-      "id, project_id, application_number, comment_id, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, due_date, created_at, updated_at, documents(title)"
+      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, documents(title)"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -98,6 +101,8 @@ export async function getReviewerCommentsByProjectSlug(
   return (data as ReviewerCommentRow[]).map((row) => ({
     id: row.id,
     project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
+    created_by_email: row.created_by_email,
     application_number: row.application_number ?? "",
     comment_id: row.comment_id ?? "",
     reviewer_name: row.reviewer_name ?? "",
@@ -110,10 +115,57 @@ export async function getReviewerCommentsByProjectSlug(
     linked_document_id: row.linked_document_id,
     linked_document_title:
       Array.isArray(row.documents) ? row.documents[0]?.title ?? undefined : row.documents?.title ?? undefined,
+    imported_from_document_id: row.imported_from_document_id,
     due_date: row.due_date,
     created_at: row.created_at,
     updated_at: row.updated_at
   }));
+}
+
+export async function getReviewerCommentById(commentId: string): Promise<ReviewerComment | null> {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const comment = seededReviewerComments.find((item) => item.id === commentId);
+    return comment ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from("reviewer_comments")
+    .select(
+      "id, project_id, created_by_user_id, created_by_email, application_number, comment_id, reviewer_name, department, status, priority, comment_text, response_text, responsible_party, linked_document_id, imported_from_document_id, due_date, created_at, updated_at, documents(title)"
+    )
+    .eq("id", commentId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const row = data as ReviewerCommentRow;
+
+  return {
+    id: row.id,
+    project_id: row.project_id,
+    created_by_user_id: row.created_by_user_id,
+    created_by_email: row.created_by_email,
+    application_number: row.application_number ?? "",
+    comment_id: row.comment_id ?? "",
+    reviewer_name: row.reviewer_name ?? "",
+    department: row.department ?? "",
+    priority: row.priority,
+    status: row.status,
+    responsible_party: row.responsible_party ?? "",
+    comment_text: row.comment_text,
+    response_text: row.response_text ?? "",
+    linked_document_id: row.linked_document_id,
+    linked_document_title:
+      Array.isArray(row.documents) ? row.documents[0]?.title ?? undefined : row.documents?.title ?? undefined,
+    imported_from_document_id: row.imported_from_document_id,
+    due_date: row.due_date,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
 }
 
 function matchesCommentFilters(comment: ReviewerComment, filters: ReviewerCommentFilters) {

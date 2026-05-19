@@ -7,6 +7,7 @@ import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { ingestDocumentChunks } from "@/lib/document-chunks";
 import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
 import { extractTextFromUploadedFile } from "@/lib/file-text-extraction";
+import { syncImportedReviewerCommentsFromDocument } from "@/lib/reviewer-comment-import";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
@@ -111,6 +112,13 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
       extractedText,
       sectionLabel: extractedText ? `${title} uploaded text` : `${title} metadata`
     });
+    await syncImportedReviewerCommentsFromDocument({
+      projectSlug,
+      documentId: documentInsert.id,
+      createdByUserId: user.id,
+      createdByEmail: user.email ?? null,
+      extractedText
+    });
   } catch (error) {
     console.error("Automatic document assistant ingest failed", error);
   }
@@ -210,6 +218,13 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
       extractedText: extractedText || versionNotes || null,
       sectionLabel: extractedText ? `${document.title} version ${nextVersionNumber} text` : `${document.title} metadata`
     });
+    await syncImportedReviewerCommentsFromDocument({
+      projectSlug,
+      documentId,
+      createdByUserId: user.id,
+      createdByEmail: user.email ?? null,
+      extractedText
+    });
   } catch (error) {
     console.error("Automatic document version assistant ingest failed", error);
   }
@@ -245,6 +260,13 @@ export async function deleteProjectDocument(projectSlug: string, documentId: str
   if (filePaths.length > 0) {
     await supabase.storage.from("project-documents").remove(filePaths);
   }
+
+  await supabase.from("reviewer_comments").delete().eq("imported_from_document_id", documentId);
+  await supabase
+    .from("reviewer_comments")
+    .update({ linked_document_id: null, updated_at: new Date().toISOString() })
+    .eq("linked_document_id", documentId)
+    .is("imported_from_document_id", null);
 
   const { error } = await supabase.from("documents").delete().eq("id", documentId);
 

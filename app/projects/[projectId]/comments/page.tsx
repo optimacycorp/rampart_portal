@@ -1,18 +1,28 @@
-import { createReviewerComment, updateReviewerComment } from "@/app/projects/[projectId]/comments/actions";
+import {
+  createReviewerComment,
+  deleteReviewerComment,
+  updateReviewerComment
+} from "@/app/projects/[projectId]/comments/actions";
+import { DeleteButton } from "@/components/DeleteButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ReviewerCommentForm } from "@/components/ReviewerCommentForm";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getReviewerCommentFilterOptions, getReviewerCommentsByProjectSlug } from "@/lib/reviewer-comments";
 
 const feedbackText: Record<string, string> = {
   created: "Reviewer comment created.",
   updated: "Reviewer comment updated.",
+  deleted: "Reviewer comment deleted.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
   "missing-required-fields": "Comment ID, reviewer, department, and comment text are required.",
   "comment-save-failed": "The reviewer comment could not be saved.",
-  "comment-update-failed": "The reviewer comment could not be updated."
+  "comment-update-failed": "The reviewer comment could not be updated.",
+  "comment-delete-failed": "The reviewer comment could not be deleted.",
+  "comment-not-found": "The requested reviewer comment could not be found.",
+  forbidden: "Only the comment creator or an audit user can delete reviewer comments."
 };
 
 export default async function CommentsPage({
@@ -33,8 +43,11 @@ export default async function CommentsPage({
 }) {
   const { projectId } = await params;
   const query = await searchParams;
-  const project = await getProjectBySlug(projectId);
-  const documents = await getDocumentsByProjectSlug(projectId);
+  const [{ user, role }, project, documents] = await Promise.all([
+    getCurrentUserContext(),
+    getProjectBySlug(projectId),
+    getDocumentsByProjectSlug(projectId)
+  ]);
   const filterOptions = getReviewerCommentFilterOptions();
   const comments = await getReviewerCommentsByProjectSlug(projectId, {
     status: query.statusFilter,
@@ -59,6 +72,7 @@ export default async function CommentsPage({
   const activeComment = query.comment ? comments.find((comment) => comment.id === query.comment) : undefined;
   const createAction = createReviewerComment.bind(null, projectId);
   const updateAction = activeComment ? updateReviewerComment.bind(null, projectId, activeComment.id) : null;
+  const deleteAction = activeComment ? deleteReviewerComment.bind(null, projectId, activeComment.id) : null;
 
   return (
     <div className="space-y-8">
@@ -174,7 +188,7 @@ export default async function CommentsPage({
       </div>
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-card">
-          <div className="grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             <span>Comment ID</span>
             <span>Application No.</span>
             <span>Reviewer</span>
@@ -184,6 +198,7 @@ export default async function CommentsPage({
             <span>Responsible Party</span>
             <span>Comment</span>
             <span>Linked Documents</span>
+            <span>Source</span>
           </div>
           <div className="divide-y divide-slate-100">
             {comments.length === 0 ? (
@@ -206,7 +221,7 @@ export default async function CommentsPage({
                 <a
                   key={comment.id}
                   href={editHref}
-                  className={`grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr] gap-4 px-5 py-4 text-sm transition ${
+                  className={`grid grid-cols-[0.9fr_1fr_1fr_1.2fr_0.7fr_0.9fr_1fr_2fr_1.3fr_0.8fr] gap-4 px-5 py-4 text-sm transition ${
                     activeComment?.id === comment.id ? "bg-emerald-50/70" : "hover:bg-slate-50"
                   }`}
                 >
@@ -219,6 +234,9 @@ export default async function CommentsPage({
                   <span className="text-slate-600">{comment.responsible_party}</span>
                   <span className="text-slate-700">{comment.comment_text}</span>
                   <span className="text-slate-600">{comment.linked_document_title ?? "Unlinked"}</span>
+                  <span className="text-slate-600">
+                    {comment.imported_from_document_id ? "Imported" : "Manual"}
+                  </span>
                 </a>
               );
             })}
@@ -239,6 +257,11 @@ export default async function CommentsPage({
                 submitLabel={activeComment ? "Save changes" : "Create comment"}
               />
             </div>
+            {activeComment && deleteAction && (role === "audit" || activeComment.created_by_user_id === user?.id) ? (
+              <form action={deleteAction} className="mt-4">
+                <DeleteButton label="Delete comment" />
+              </form>
+            ) : null}
           </div>
           {activeComment ? (
             <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">

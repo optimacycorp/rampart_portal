@@ -12,6 +12,8 @@ export type Project = {
 export type ReviewerComment = {
   id: string;
   project_id?: string;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
   application_number: string;
   comment_id: string;
   reviewer_name: string;
@@ -30,6 +32,7 @@ export type ReviewerComment = {
   response_text?: string;
   linked_document_id?: string | null;
   linked_document_title?: string;
+  imported_from_document_id?: string | null;
   due_date?: string | null;
   created_at?: string;
   updated_at?: string;
