@@ -6,32 +6,11 @@ import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-s
 import { DOCUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { ingestDocumentChunks } from "@/lib/document-chunks";
 import { getDocumentById, getDocumentVersions, getProjectBySlug } from "@/lib/documents";
+import { extractTextFromUploadedFile } from "@/lib/file-text-extraction";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-async function extractSupportedUploadText(file: FormDataEntryValue | null) {
-  if (!(file instanceof File) || file.size === 0) {
-    return null;
-  }
-
-  const name = file.name.toLowerCase();
-  const type = (file.type || "").toLowerCase();
-  const supportedTextFile =
-    type.startsWith("text/") ||
-    name.endsWith(".txt") ||
-    name.endsWith(".md") ||
-    name.endsWith(".csv") ||
-    name.endsWith(".json");
-
-  if (!supportedTextFile) {
-    return null;
-  }
-
-  const text = (await file.text()).trim();
-  return text || null;
 }
 
 export async function uploadProjectDocument(projectSlug: string, formData: FormData) {
@@ -127,7 +106,7 @@ export async function uploadProjectDocument(projectSlug: string, formData: FormD
   }
 
   try {
-    const extractedText = await extractSupportedUploadText(file);
+    const extractedText = await extractTextFromUploadedFile(file);
     await ingestDocumentChunks(projectSlug, documentInsert.id, {
       extractedText,
       sectionLabel: extractedText ? `${title} uploaded text` : `${title} metadata`
@@ -226,7 +205,7 @@ export async function uploadDocumentVersion(projectSlug: string, documentId: str
   }
 
   try {
-    const extractedText = await extractSupportedUploadText(file);
+    const extractedText = await extractTextFromUploadedFile(file);
     await ingestDocumentChunks(projectSlug, documentId, {
       extractedText: extractedText || versionNotes || null,
       sectionLabel: extractedText ? `${document.title} version ${nextVersionNumber} text` : `${document.title} metadata`

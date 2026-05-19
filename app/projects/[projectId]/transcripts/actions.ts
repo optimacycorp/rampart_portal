@@ -5,33 +5,12 @@ import { redirect } from "next/navigation";
 import { getCurrentUserContext, requireUploadManagementRole } from "@/lib/auth-server";
 import { ingestTranscriptChunks } from "@/lib/document-chunks";
 import { getProjectBySlug } from "@/lib/documents";
+import { extractTextFromUploadedFile } from "@/lib/file-text-extraction";
 import { getMeetingTranscriptById } from "@/lib/meeting-transcripts";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-async function extractSupportedUploadText(file: FormDataEntryValue | null) {
-  if (!(file instanceof File) || file.size === 0) {
-    return null;
-  }
-
-  const name = file.name.toLowerCase();
-  const type = (file.type || "").toLowerCase();
-  const supportedTextFile =
-    type.startsWith("text/") ||
-    name.endsWith(".txt") ||
-    name.endsWith(".md") ||
-    name.endsWith(".csv") ||
-    name.endsWith(".json");
-
-  if (!supportedTextFile) {
-    return null;
-  }
-
-  const text = (await file.text()).trim();
-  return text || null;
 }
 
 async function uploadOptionalFile(projectSlug: string, transcriptId: string, file: FormDataEntryValue | null, prefix: string) {
@@ -115,7 +94,9 @@ export async function uploadMeetingTranscript(projectSlug: string, formData: For
   }
 
   try {
-    const extractedTranscriptFileText = await extractSupportedUploadText(transcriptFile);
+    const extractedTranscriptFileText = await extractTextFromUploadedFile(
+      transcriptFile instanceof File ? transcriptFile : null
+    );
     await ingestTranscriptChunks(projectSlug, transcriptId, {
       extractedText: transcriptText || extractedTranscriptFileText || notes || null,
       sectionLabel: transcriptText || extractedTranscriptFileText ? `${title} transcript text` : `${title} metadata`

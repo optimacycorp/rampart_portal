@@ -120,7 +120,7 @@ export default async function DocumentsPage({
               </p>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-              {supabaseConfigured ? "Live" : "Fallback"}
+              {supabaseConfigured ? "Connected" : "Offline"}
             </span>
           </div>
           <div className="mt-5">
