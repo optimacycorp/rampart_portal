@@ -2,7 +2,14 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 
 function normalizeExtractedText(text: string | null | undefined) {
-  const normalized = `${text ?? ""}`.replace(/\s+/g, " ").trim();
+  const normalized = `${text ?? ""}`
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return normalized || null;
 }
 

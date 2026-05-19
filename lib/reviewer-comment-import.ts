@@ -52,6 +52,7 @@ function isSkippableLine(line: string) {
     /^Comment$/i.test(line) ||
     /^ID$/i.test(line) ||
     /^Page Reference$/i.test(line) ||
+    /^Page Reference Annotation$/i.test(line) ||
     /^Annotation$/i.test(line) ||
     /^Type$/i.test(line) ||
     /^Status$/i.test(line) ||
@@ -77,7 +78,7 @@ function isNonCommentDrawingLine(line: string) {
     /^Notice:$/i.test(line) ||
     /^LEGEND:$/i.test(line) ||
     /^PROJECT$/i.test(line) ||
-    /^VICINITY MAP/i.test(line) ||
+    /^VICINITY MAP(?:\s*\(NTS\))?$/i.test(line) ||
     /^R E V I S I O N S$/i.test(line) ||
     /^MARR LAND SURVEYING$/i.test(line) ||
     /^FILE NO\./i.test(line) ||

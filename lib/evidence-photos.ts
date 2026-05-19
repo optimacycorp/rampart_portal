@@ -19,7 +19,7 @@ export async function getEvidencePhotosByProjectSlug(projectSlug: string): Promi
   const { data, error } = await supabase
     .from("evidence_photos")
     .select(
-      "id, project_id, title, photo_date, latitude, longitude, easting, northing, direction_facing, category, file_path, notes, linked_point_id, created_by_user_id, created_by_email, created_at"
+      "id, project_id, title, media_kind, mime_type, photo_date, latitude, longitude, easting, northing, direction_facing, category, file_path, notes, linked_point_id, created_by_user_id, created_by_email, created_at"
     )
     .eq("project_id", project.id)
     .order("created_at", { ascending: false });
@@ -41,7 +41,7 @@ export async function getEvidencePhotoById(photoId: string): Promise<EvidencePho
   const { data, error } = await supabase
     .from("evidence_photos")
     .select(
-      "id, project_id, title, photo_date, latitude, longitude, easting, northing, direction_facing, category, file_path, notes, linked_point_id, created_by_user_id, created_by_email, created_at"
+      "id, project_id, title, media_kind, mime_type, photo_date, latitude, longitude, easting, northing, direction_facing, category, file_path, notes, linked_point_id, created_by_user_id, created_by_email, created_at"
     )
     .eq("id", photoId)
     .single();

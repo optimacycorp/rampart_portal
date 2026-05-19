@@ -48,6 +48,8 @@ export async function uploadEvidencePhoto(projectSlug: string, formData: FormDat
     redirect(`/projects/${projectSlug}/photos?error=file-required`);
   }
 
+  const mediaKind = file.type.startsWith("video/") ? "video" : "photo";
+
   const photoId = crypto.randomUUID();
   const storagePath = `${project.slug}/photos/${photoId}-${Date.now()}-${sanitizeFileName(file.name)}`;
   const arrayBuffer = await file.arrayBuffer();
@@ -65,6 +67,8 @@ export async function uploadEvidencePhoto(projectSlug: string, formData: FormDat
     id: photoId,
     project_id: project.id,
     title,
+    media_kind: mediaKind,
+    mime_type: file.type || null,
     photo_date: `${formData.get("photo_date") ?? ""}`.trim() || null,
     latitude: parseOptionalNumber(formData.get("latitude")),
     longitude: parseOptionalNumber(formData.get("longitude")),
@@ -81,7 +85,7 @@ export async function uploadEvidencePhoto(projectSlug: string, formData: FormDat
 
   if (error) {
     await supabase.storage.from("field-photos").remove([storagePath]);
-    redirect(`/projects/${projectSlug}/photos?error=photo-save-failed`);
+    redirect(`/projects/${projectSlug}/photos?error=media-save-failed`);
   }
 
   revalidatePath(`/projects/${projectSlug}/photos`);

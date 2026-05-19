@@ -11,7 +11,7 @@ export function PhotoEvidenceUploadForm({ action, fieldPoints }: PhotoEvidenceUp
     <form action={action} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-slate-700">Photo title</span>
+          <span className="mb-2 block text-sm font-medium text-slate-700">Media title</span>
           <input
             name="title"
             required
@@ -105,12 +105,15 @@ export function PhotoEvidenceUploadForm({ action, fieldPoints }: PhotoEvidenceUp
         </label>
       </div>
       <label className="block">
-        <span className="mb-2 block text-sm font-medium text-slate-700">Photo upload</span>
+        <span className="mb-2 block text-sm font-medium text-slate-700">Photo or video upload</span>
+        <p className="mb-2 text-xs text-slate-500">
+          Images and field videos are both supported here and will be stored in the same evidence library.
+        </p>
         <input
           name="file"
           required
           type="file"
-          accept="image/*,.jpg,.jpeg,.png,.webp,.heic"
+          accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.heic,.mp4,.mov,.m4v,.webm"
           className="w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700"
         />
       </label>
@@ -127,7 +130,7 @@ export function PhotoEvidenceUploadForm({ action, fieldPoints }: PhotoEvidenceUp
         type="submit"
         className="rounded-full bg-pine px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
       >
-        Upload photo evidence
+        Upload media evidence
       </button>
     </form>
   );

@@ -106,6 +106,8 @@ export type EvidencePhoto = {
   id: string;
   project_id: string;
   title: string;
+  media_kind?: "photo" | "video" | null;
+  mime_type?: string | null;
   photo_date?: string | null;
   latitude?: number | null;
   longitude?: number | null;
