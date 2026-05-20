@@ -235,3 +235,36 @@ export type DocumentVersion = {
   superseded_at: string | null;
   created_at: string;
 };
+
+export type ProjectPlanType = "site_plan" | "land_usability" | "final_plat" | "building_plans";
+
+export type ProjectPlan = {
+  id: string;
+  project_id: string;
+  plan_type: ProjectPlanType;
+  title: string;
+  description?: string | null;
+  current_version_number: number;
+  current_file_path?: string | null;
+  current_mime_type?: string | null;
+  current_file_name?: string | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectPlanVersion = {
+  id: string;
+  plan_id: string;
+  uploaded_by_user_id?: string | null;
+  uploaded_by_email?: string | null;
+  version_number: number;
+  file_path: string;
+  file_name?: string | null;
+  mime_type?: string | null;
+  notes?: string | null;
+  is_current: boolean;
+  superseded_at?: string | null;
+  created_at: string;
+};

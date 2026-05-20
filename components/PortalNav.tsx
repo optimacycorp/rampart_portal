@@ -10,6 +10,7 @@ const links = [
   { href: "/", label: "Dashboard" },
   { href: "/projects", label: "Projects" },
   { href: `/projects/${seededProject.slug}/documents`, label: "Documents" },
+  { href: `/projects/${seededProject.slug}/plans`, label: "Plans" },
   { href: `/projects/${seededProject.slug}/comments`, label: "Comments" },
   { href: `/projects/${seededProject.slug}/map`, label: "Map" },
   { href: `/projects/${seededProject.slug}/field-points`, label: "Field Points" },

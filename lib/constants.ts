@@ -49,3 +49,19 @@ export const PHOTO_CATEGORY_OPTIONS = [
   "utility",
   "general"
 ] as const;
+
+export const PLAN_TYPE_OPTIONS = ["site_plan", "land_usability", "final_plat", "building_plans"] as const;
+
+export const PLAN_TYPE_LABELS: Record<(typeof PLAN_TYPE_OPTIONS)[number], string> = {
+  site_plan: "Site Plan",
+  land_usability: "Land Usability",
+  final_plat: "Final Plat",
+  building_plans: "Building Plans"
+};
+
+export const PLAN_TYPE_HINTS: Record<(typeof PLAN_TYPE_OPTIONS)[number], string> = {
+  site_plan: "Current site plan sheets and revisions used for coordination and review.",
+  land_usability: "Land usability exhibits, hillside or site-constraint sheets, and related revisions.",
+  final_plat: "Final plat submissions, revisions, and recorded-ready plan sheets.",
+  building_plans: "Building plan sets, architectural sheets, and related review revisions."
+};

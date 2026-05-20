@@ -6,6 +6,7 @@ import { seededProject, seededReviewerComments } from "@/lib/mock-data";
 
 const projectLinks = [
   { href: "documents", label: "Documents", hint: "Upload and organize recorded instruments and reports." },
+  { href: "plans", label: "Plans", hint: "Manage the current site plan, land usability, final plat, and building plan sets." },
   { href: "comments", label: "Reviewer Comments", hint: "Track city, utility, fire, and USFS review items." },
   { href: "map", label: "Field Evidence Map", hint: "Preview field points and map-ready evidence layers." },
   { href: "field-points", label: "Field Points", hint: "Import and validate Emlid or survey-adjacent GPS points." },
