@@ -70,6 +70,26 @@ export function LidarScanForm({ action }: LidarScanFormProps) {
           />
         </label>
         <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Center latitude</span>
+          <input
+            name="center_latitude"
+            type="number"
+            step="0.000001"
+            placeholder="38.921764"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">Center longitude</span>
+          <input
+            name="center_longitude"
+            type="number"
+            step="0.000001"
+            placeholder="-104.617738"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
           <span className="mb-2 block text-sm font-medium text-slate-700">Point count</span>
           <input
             name="point_count"
@@ -102,6 +122,46 @@ export function LidarScanForm({ action }: LidarScanFormProps) {
             name="max_elevation"
             type="number"
             step="0.001"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">BBox west</span>
+          <input
+            name="bbox_west"
+            type="number"
+            step="0.000001"
+            placeholder="-104.621000"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">BBox south</span>
+          <input
+            name="bbox_south"
+            type="number"
+            step="0.000001"
+            placeholder="38.919500"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">BBox east</span>
+          <input
+            name="bbox_east"
+            type="number"
+            step="0.000001"
+            placeholder="-104.614200"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-slate-700">BBox north</span>
+          <input
+            name="bbox_north"
+            type="number"
+            step="0.000001"
+            placeholder="38.924100"
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-pine"
           />
         </label>

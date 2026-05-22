@@ -279,6 +279,12 @@ export type LidarScan = {
   center_easting?: number | null;
   center_northing?: number | null;
   center_elevation?: number | null;
+  center_latitude?: number | null;
+  center_longitude?: number | null;
+  bbox_west?: number | null;
+  bbox_south?: number | null;
+  bbox_east?: number | null;
+  bbox_north?: number | null;
   raw_file_path?: string | null;
   tile_path?: string | null;
   preview_image_path?: string | null;

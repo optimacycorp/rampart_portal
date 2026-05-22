@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { LidarScanInsetMap } from "@/components/LidarScanInsetMap";
 import { PageHeader } from "@/components/PageHeader";
 import { PotreeViewer } from "@/components/PotreeViewer";
 import { LIDAR_DISCLAIMER } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
-import { getLidarScanById } from "@/lib/lidar";
+import { getLidarScanById, getNearbyFieldPointsForLidarScan } from "@/lib/lidar";
 
 function formatDate(value?: string | null) {
   return value ? new Date(value).toLocaleDateString() : "No scan date";
@@ -26,6 +27,8 @@ export default async function LidarScanDetailPage({
     );
   }
 
+  const nearbyFieldPoints = await getNearbyFieldPointsForLidarScan(projectId, scan, 8);
+
   const metadataRows = [
     `Scan date: ${formatDate(scan.scan_date)}`,
     `Equipment: ${scan.equipment ?? "Unknown"}`,
@@ -33,6 +36,8 @@ export default async function LidarScanDetailPage({
     `Center easting: ${scan.center_easting ?? "Unknown"}`,
     `Center northing: ${scan.center_northing ?? "Unknown"}`,
     `Center elevation: ${scan.center_elevation ?? "Unknown"}`,
+    `Center latitude: ${scan.center_latitude ?? "Unknown"}`,
+    `Center longitude: ${scan.center_longitude ?? "Unknown"}`,
     `Point count: ${scan.point_count?.toLocaleString() ?? "Unknown"}`,
     `Area acres: ${scan.area_acres ?? "Unknown"}`,
     `Min elevation: ${scan.min_elevation ?? "Unknown"}`,
@@ -90,10 +95,52 @@ export default async function LidarScanDetailPage({
         </main>
         <aside className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-card">
           <div>
-            <h2 className="text-lg font-semibold text-ink">Selection / linked stats</h2>
+            <h2 className="text-lg font-semibold text-ink">Context / linked evidence</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Use Potree tools to inspect coordinates, profiles, clipping, and elevation changes. Record linked GPS control, culverts, berms, and photos in the scan notes for this MVP.
+              Use Potree tools to inspect coordinates, profiles, clipping, and elevation changes. The inset map and nearby field points below give this scan practical site context for coordination review.
             </p>
+          </div>
+          <div>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">Inset map / footprint</h3>
+            <LidarScanInsetMap
+              centerLatitude={scan.center_latitude}
+              centerLongitude={scan.center_longitude}
+              bboxWest={scan.bbox_west}
+              bboxSouth={scan.bbox_south}
+              bboxEast={scan.bbox_east}
+              bboxNorth={scan.bbox_north}
+              title={scan.title}
+            />
+          </div>
+          <div>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">Nearby field points</h3>
+            <div className="space-y-3">
+              {nearbyFieldPoints.length === 0 ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+                  No nearby field points could be linked automatically yet. Add center easting, northing, and matching coordinate system metadata to compare LiDAR scans against imported GPS points.
+                </div>
+              ) : (
+                nearbyFieldPoints.map((point) => (
+                  <div key={point.id} className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-slate-900">{point.point_name}</p>
+                        <p className="mt-1 text-slate-500">
+                          {point.point_type} | {point.confidence}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                        {(point.distanceFromCenter as number).toFixed(1)} ft
+                      </span>
+                    </div>
+                    <p className="mt-2 text-slate-600">
+                      Elevation: {point.elevation ?? "Unknown"} | Easting: {point.easting ?? "Unknown"} | Northing: {point.northing ?? "Unknown"}
+                    </p>
+                    {point.description ? <p className="mt-2 text-slate-600">{point.description}</p> : null}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
             {scan.notes ?? "No LiDAR scan notes entered yet."}
