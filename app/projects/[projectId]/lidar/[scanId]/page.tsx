@@ -9,6 +9,7 @@ import { PotreeViewer } from "@/components/PotreeViewer";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { LIDAR_DISCLAIMER } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
+import { getFieldPointsByProjectSlug } from "@/lib/field-points";
 import { getLidarScanById, getNearbyFieldPointsForLidarScan } from "@/lib/lidar";
 
 function formatDate(value?: string | null) {
@@ -24,10 +25,11 @@ export default async function LidarScanDetailPage({
 }) {
   const { projectId, scanId } = await params;
   const query = await searchParams;
-  const [project, scan, { user, role }] = await Promise.all([
+  const [project, scan, { user, role }, projectFieldPoints] = await Promise.all([
     getProjectBySlug(projectId),
     getLidarScanById(scanId),
-    getCurrentUserContext()
+    getCurrentUserContext(),
+    getFieldPointsByProjectSlug(projectId)
   ]);
 
   if (!project || !scan) {
@@ -39,6 +41,14 @@ export default async function LidarScanDetailPage({
   }
 
   const nearbyFieldPoints = await getNearbyFieldPointsForLidarScan(projectId, scan, 8);
+  const overlayFieldPoints = projectFieldPoints.filter(
+    (point) =>
+      point.easting != null &&
+      point.northing != null &&
+      point.coordinate_system &&
+      scan.coordinate_system &&
+      point.coordinate_system.trim().toLowerCase() === scan.coordinate_system.trim().toLowerCase()
+  );
   const canManage = role === "audit" || (Boolean(user) && scan.created_by_user_id === user?.id);
   const updateAction = updateLidarScan.bind(null, projectId, scanId);
 
@@ -138,7 +148,7 @@ export default async function LidarScanDetailPage({
               Load a Potree <code>cloud.js</code> or accessible point tile URL to navigate the scan in-browser. This is intended for coordination review rather than certified measurements.
             </p>
           </div>
-          <PotreeViewer tilePath={scan.tile_path} title={scan.title} />
+          <PotreeViewer tilePath={scan.tile_path} title={scan.title} fieldPoints={overlayFieldPoints} />
         </main>
         <aside className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-card">
           <div>
