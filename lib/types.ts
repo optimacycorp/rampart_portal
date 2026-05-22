@@ -272,7 +272,12 @@ export type ProjectPlanVersion = {
 export type LidarScan = {
   id: string;
   project_id: string;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
   title: string;
+  status?: string | null;
+  processing_stage?: string | null;
+  tile_format?: string | null;
   scan_date?: string | null;
   equipment?: string | null;
   coordinate_system?: string | null;
@@ -294,4 +299,5 @@ export type LidarScan = {
   max_elevation?: number | null;
   notes?: string | null;
   created_at: string;
+  updated_at?: string | null;
 };

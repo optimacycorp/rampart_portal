@@ -19,7 +19,7 @@ export async function getLidarScansByProjectSlug(projectSlug: string): Promise<L
   const { data, error } = await supabase
     .from("lidar_scans")
     .select(
-      "id, project_id, title, scan_date, equipment, coordinate_system, center_easting, center_northing, center_elevation, center_latitude, center_longitude, bbox_west, bbox_south, bbox_east, bbox_north, raw_file_path, tile_path, preview_image_path, point_count, area_acres, min_elevation, max_elevation, notes, created_at"
+      "id, project_id, created_by_user_id, created_by_email, title, status, processing_stage, tile_format, scan_date, equipment, coordinate_system, center_easting, center_northing, center_elevation, center_latitude, center_longitude, bbox_west, bbox_south, bbox_east, bbox_north, raw_file_path, tile_path, preview_image_path, point_count, area_acres, min_elevation, max_elevation, notes, created_at, updated_at"
     )
     .eq("project_id", project.id)
     .order("scan_date", { ascending: false, nullsFirst: false })
@@ -42,7 +42,7 @@ export async function getLidarScanById(scanId: string): Promise<LidarScan | null
   const { data, error } = await supabase
     .from("lidar_scans")
     .select(
-      "id, project_id, title, scan_date, equipment, coordinate_system, center_easting, center_northing, center_elevation, center_latitude, center_longitude, bbox_west, bbox_south, bbox_east, bbox_north, raw_file_path, tile_path, preview_image_path, point_count, area_acres, min_elevation, max_elevation, notes, created_at"
+      "id, project_id, created_by_user_id, created_by_email, title, status, processing_stage, tile_format, scan_date, equipment, coordinate_system, center_easting, center_northing, center_elevation, center_latitude, center_longitude, bbox_west, bbox_south, bbox_east, bbox_north, raw_file_path, tile_path, preview_image_path, point_count, area_acres, min_elevation, max_elevation, notes, created_at, updated_at"
     )
     .eq("id", scanId)
     .single();

@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { deleteLidarScan, updateLidarScan } from "@/app/projects/[projectId]/lidar/actions";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { FormActionButton } from "@/components/FormActionButton";
 import { LidarScanInsetMap } from "@/components/LidarScanInsetMap";
+import { LidarScanForm } from "@/components/LidarScanForm";
 import { PageHeader } from "@/components/PageHeader";
 import { PotreeViewer } from "@/components/PotreeViewer";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { LIDAR_DISCLAIMER } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
 import { getLidarScanById, getNearbyFieldPointsForLidarScan } from "@/lib/lidar";
@@ -12,12 +16,19 @@ function formatDate(value?: string | null) {
 }
 
 export default async function LidarScanDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ projectId: string; scanId: string }>;
+  searchParams: Promise<{ status?: string; error?: string }>;
 }) {
   const { projectId, scanId } = await params;
-  const [project, scan] = await Promise.all([getProjectBySlug(projectId), getLidarScanById(scanId)]);
+  const query = await searchParams;
+  const [project, scan, { user, role }] = await Promise.all([
+    getProjectBySlug(projectId),
+    getLidarScanById(scanId),
+    getCurrentUserContext()
+  ]);
 
   if (!project || !scan) {
     return (
@@ -28,8 +39,22 @@ export default async function LidarScanDetailPage({
   }
 
   const nearbyFieldPoints = await getNearbyFieldPointsForLidarScan(projectId, scan, 8);
+  const canManage = role === "audit" || (Boolean(user) && scan.created_by_user_id === user?.id);
+  const updateAction = updateLidarScan.bind(null, projectId, scanId);
+
+  const feedbackText: Record<string, string> = {
+    updated: "LiDAR scan metadata updated.",
+    forbidden: "Only the uploader or an audit user can manage LiDAR scan records.",
+    "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
+    "scan-not-found": "The requested LiDAR scan record could not be found.",
+    "missing-required-fields": "Scan title is required.",
+    "lidar-save-failed": "The LiDAR scan metadata could not be saved."
+  };
 
   const metadataRows = [
+    `Status: ${scan.status ?? "registered"}`,
+    `Processing stage: ${scan.processing_stage ?? "raw_uploaded"}`,
+    `Tile format: ${scan.tile_format ?? "potree"}`,
     `Scan date: ${formatDate(scan.scan_date)}`,
     `Equipment: ${scan.equipment ?? "Unknown"}`,
     `Coordinate system: ${scan.coordinate_system ?? "Unknown"}`,
@@ -55,6 +80,12 @@ export default async function LidarScanDetailPage({
         <strong>LiDAR coordination notice:</strong> {LIDAR_DISCLAIMER}
       </div>
       <DisclaimerBanner />
+      {query.status && feedbackText[query.status] ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{feedbackText[query.status]}</div>
+      ) : null}
+      {query.error && feedbackText[query.error] ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{feedbackText[query.error]}</div>
+      ) : null}
       <div className="grid gap-6 xl:grid-cols-[0.32fr_1fr_0.36fr]">
         <aside className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-card">
           <div>
@@ -68,6 +99,11 @@ export default async function LidarScanDetailPage({
               </div>
             ))}
           </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            Uploaded by {scan.created_by_email ?? "Unknown"}<br />
+            Created {new Date(scan.created_at).toLocaleString()}
+            {scan.updated_at ? ` • Updated ${new Date(scan.updated_at).toLocaleString()}` : ""}
+          </div>
           <div className="flex flex-wrap gap-2">
             {scan.raw_file_path ? (
               <a href={scan.raw_file_path} target="_blank" rel="noreferrer" className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
@@ -80,6 +116,17 @@ export default async function LidarScanDetailPage({
               </a>
             ) : null}
           </div>
+          {canManage ? (
+            <form action={deleteLidarScan.bind(null, projectId, scanId)}>
+              <FormActionButton
+                idleLabel="Delete scan"
+                pendingLabel="Deleting..."
+                className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+              />
+            </form>
+          ) : (
+            <p className="text-sm text-slate-500">Only the uploader or an audit user can edit or delete this scan.</p>
+          )}
           <Link href={`/projects/${projectId}/lidar`} className="inline-flex rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
             Back to scan library
           </Link>
@@ -154,6 +201,21 @@ export default async function LidarScanDetailPage({
               No preview image provided.
             </div>
           )}
+          {canManage ? (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+              <h3 className="text-lg font-semibold text-ink">Edit LiDAR metadata</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Update scan status, processing stage, map-ready footprint values, and external asset links without re-registering the scan.
+              </p>
+              <div className="mt-5">
+                <LidarScanForm
+                  action={updateAction}
+                  initialValues={scan}
+                  submitLabel="Save LiDAR updates"
+                />
+              </div>
+            </div>
+          ) : null}
         </aside>
       </div>
     </div>

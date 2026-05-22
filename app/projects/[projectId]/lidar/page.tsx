@@ -9,10 +9,14 @@ import { getLidarScansByProjectSlug } from "@/lib/lidar";
 
 const feedbackText: Record<string, string> = {
   created: "LiDAR scan metadata saved.",
+  deleted: "LiDAR scan deleted.",
   "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
   "project-not-found": "The requested project could not be found.",
   "missing-required-fields": "Scan title is required.",
-  "lidar-save-failed": "The LiDAR scan metadata could not be saved."
+  forbidden: "Only the uploader or an audit user can manage LiDAR scan records.",
+  "scan-not-found": "The requested LiDAR scan record could not be found.",
+  "lidar-save-failed": "The LiDAR scan metadata could not be saved.",
+  "lidar-delete-failed": "The LiDAR scan could not be deleted."
 };
 
 function formatDate(value?: string | null) {
@@ -103,6 +107,17 @@ export default async function LidarPage({
                       <p className="mt-1 text-sm text-slate-500">
                         {formatDate(scan.scan_date)} | {scan.equipment ?? "Equipment pending"}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                          {(scan.status ?? "registered").replaceAll("_", " ")}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                          {(scan.processing_stage ?? "raw_uploaded").replaceAll("_", " ")}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                          {(scan.tile_format ?? "potree").toUpperCase()}
+                        </span>
+                      </div>
                     </div>
                     <Link href={`/projects/${projectId}/lidar/${scan.id}`} className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white">
                       Open scan
