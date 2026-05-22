@@ -268,3 +268,24 @@ export type ProjectPlanVersion = {
   superseded_at?: string | null;
   created_at: string;
 };
+
+export type LidarScan = {
+  id: string;
+  project_id: string;
+  title: string;
+  scan_date?: string | null;
+  equipment?: string | null;
+  coordinate_system?: string | null;
+  center_easting?: number | null;
+  center_northing?: number | null;
+  center_elevation?: number | null;
+  raw_file_path?: string | null;
+  tile_path?: string | null;
+  preview_image_path?: string | null;
+  point_count?: number | null;
+  area_acres?: number | null;
+  min_elevation?: number | null;
+  max_elevation?: number | null;
+  notes?: string | null;
+  created_at: string;
+};

@@ -65,3 +65,6 @@ export const PLAN_TYPE_HINTS: Record<(typeof PLAN_TYPE_OPTIONS)[number], string>
   final_plat: "Final plat submissions, revisions, and recorded-ready plan sheets.",
   building_plans: "Building plan sets, architectural sheets, and related review revisions."
 };
+
+export const LIDAR_DISCLAIMER =
+  "LiDAR point cloud data is provided for project coordination and existing-conditions visualization only. It is not a certified survey, engineering surface, legal boundary determination, or agency-approved grading plan unless reviewed and certified by the appropriate licensed professional.";
