@@ -58,6 +58,14 @@ function parseArgs(argv) {
       index += 1;
     } else if (arg === "--write-storage") {
       result.writeStorage = true;
+    } else if (arg === "--no-write-storage") {
+      result.writeStorage = false;
+    } else if (arg === "--write-db") {
+      result.writeDb = true;
+    } else if (arg === "--no-write-db") {
+      result.writeDb = false;
+    } else if (arg === "--aggressive") {
+      result.aggressive = true;
     } else if (arg === "--json") {
       result.json = true;
     }
@@ -82,6 +90,29 @@ function summarizeError(error) {
   return error.message || JSON.stringify(error);
 }
 
+function randomInt(max) {
+  return Math.floor(Math.random() * max);
+}
+
+function pickRandom(items, count) {
+  const copy = [...items];
+  const picked = [];
+
+  while (copy.length > 0 && picked.length < count) {
+    picked.push(copy.splice(randomInt(copy.length), 1)[0]);
+  }
+
+  return picked;
+}
+
+function safeObjectKeys(value) {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  return Object.keys(value).slice(0, 8);
+}
+
 async function main() {
   loadLocalEnv();
 
@@ -91,10 +122,19 @@ async function main() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const projectSlug = args.projectSlug || process.env.SUPABASE_KEEPALIVE_PROJECT_SLUG || null;
   const shouldWriteStorage =
-    args.writeStorage || toBoolean(process.env.SUPABASE_KEEPALIVE_STORAGE_WRITE);
+    typeof args.writeStorage === "boolean"
+      ? args.writeStorage
+      : toBoolean(process.env.SUPABASE_KEEPALIVE_STORAGE_WRITE || "true");
+  const shouldWriteDb =
+    typeof args.writeDb === "boolean"
+      ? args.writeDb
+      : toBoolean(process.env.SUPABASE_KEEPALIVE_DB_WRITE || "true");
+  const aggressiveMode =
+    args.aggressive || toBoolean(process.env.SUPABASE_KEEPALIVE_AGGRESSIVE || "true");
   const keepaliveSource = process.env.SUPABASE_KEEPALIVE_SOURCE || "racknerd-cron";
   const storageProbeBucket = process.env.SUPABASE_KEEPALIVE_STORAGE_BUCKET || "exports";
   const retentionDays = Number(process.env.SUPABASE_KEEPALIVE_RETENTION_DAYS || "45");
+  const signedUrlTtlSeconds = Number(process.env.SUPABASE_KEEPALIVE_SIGNED_URL_TTL_SECONDS || "300");
 
   if (!supabaseUrl || !serviceRoleKey) {
     console.error(
@@ -112,7 +152,11 @@ async function main() {
 
   const results = [];
   let hadCriticalFailure = false;
+  let warningCount = 0;
+  let errorCount = 0;
   let targetProject = null;
+  let heartbeatId = null;
+  const runKey = `${keepaliveSource}-${startedAt.toISOString()}-${Math.random().toString(36).slice(2, 8)}`;
 
   async function probe(name, fn, { optional = false } = {}) {
     const probeStartedAt = Date.now();
@@ -137,6 +181,9 @@ async function main() {
 
       if (!optional) {
         hadCriticalFailure = true;
+        errorCount += 1;
+      } else {
+        warningCount += 1;
       }
 
       return null;
@@ -166,22 +213,22 @@ async function main() {
   });
 
   const projectScopedTables = [
-    "documents",
-    "reviewer_comments",
-    "field_points",
-    "culverts",
-    "access_logs",
-    "evidence_photos",
-    "meeting_transcripts",
-    "lidar_scans",
-    "project_plans",
-    "project_tasks",
-    "document_chunks"
+    { name: "documents", orderColumn: "updated_at", optional: false },
+    { name: "reviewer_comments", orderColumn: "updated_at", optional: false },
+    { name: "field_points", orderColumn: "created_at", optional: false },
+    { name: "culverts", orderColumn: "updated_at", optional: false },
+    { name: "access_logs", orderColumn: "created_at", optional: false },
+    { name: "evidence_photos", orderColumn: "created_at", optional: false },
+    { name: "meeting_transcripts", orderColumn: "updated_at", optional: false },
+    { name: "lidar_scans", orderColumn: "updated_at", optional: false },
+    { name: "project_plans", orderColumn: "updated_at", optional: false },
+    { name: "project_tasks", orderColumn: "updated_at", optional: true },
+    { name: "document_chunks", orderColumn: "created_at", optional: true }
   ];
 
-  for (const tableName of projectScopedTables) {
-    await probe(`${tableName}-read`, async () => {
-      let query = supabase.from(tableName).select("*", { count: "exact" }).limit(1);
+  for (const tableConfig of projectScopedTables) {
+    await probe(`${tableConfig.name}-read`, async () => {
+      let query = supabase.from(tableConfig.name).select("*", { count: "exact" }).limit(1);
 
       if (targetProject?.id) {
         query = query.eq("project_id", targetProject.id);
@@ -194,12 +241,38 @@ async function main() {
       }
 
       return {
-        table: tableName,
+        table: tableConfig.name,
         projectScoped: Boolean(targetProject?.id),
         count,
-        sampleKeys: data?.[0] ? Object.keys(data[0]).slice(0, 8) : []
+        sampleKeys: safeObjectKeys(data?.[0])
       };
-    }, { optional: tableName === "project_tasks" || tableName === "document_chunks" });
+    }, { optional: tableConfig.optional });
+  }
+
+  for (const tableConfig of pickRandom(projectScopedTables, aggressiveMode ? 6 : 3)) {
+    await probe(`${tableConfig.name}-recent-sample`, async () => {
+      let query = supabase
+        .from(tableConfig.name)
+        .select("*")
+        .order(tableConfig.orderColumn, { ascending: false })
+        .limit(3);
+
+      if (targetProject?.id) {
+        query = query.eq("project_id", targetProject.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        table: tableConfig.name,
+        rowsRead: data?.length ?? 0,
+        firstRowKeys: safeObjectKeys(data?.[0])
+      };
+    }, { optional: tableConfig.optional });
   }
 
   await probe("auth-admin-read", async () => {
@@ -263,51 +336,114 @@ async function main() {
     }, { optional: !bucketNames.includes(bucketName) });
   }
 
-  await probe("keepalive-heartbeat-write", async () => {
-    const payload = {
-      source: keepaliveSource,
-      status: hadCriticalFailure ? "degraded" : "ok",
-      details: {
-        host: os.hostname(),
-        node: process.version,
-        projectSlug: projectSlug ?? targetProject?.slug ?? null,
-        startedAt: startedAt.toISOString()
+  if (shouldWriteDb) {
+    await probe("keepalive-heartbeat-write", async () => {
+      const payload = {
+        source: keepaliveSource,
+        status: hadCriticalFailure ? "degraded" : "ok",
+        details: {
+          runKey,
+          host: os.hostname(),
+          node: process.version,
+          projectSlug: projectSlug ?? targetProject?.slug ?? null,
+          startedAt: startedAt.toISOString(),
+          mode: aggressiveMode ? "aggressive" : "standard"
+        }
+      };
+
+      const { data, error: insertError } = await supabase
+        .from("system_keepalive_events")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError) {
+        throw insertError;
       }
-    };
 
-    const { error: insertError } = await supabase
-      .from("system_keepalive_events")
-      .insert(payload);
+      heartbeatId = data?.id ?? null;
 
-    if (insertError) {
-      throw insertError;
-    }
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+      const { error: cleanupError } = await supabase
+        .from("system_keepalive_events")
+        .delete()
+        .lt("ran_at", cutoff);
 
-    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
-    const { error: cleanupError } = await supabase
-      .from("system_keepalive_events")
-      .delete()
-      .lt("ran_at", cutoff);
+      if (cleanupError) {
+        throw cleanupError;
+      }
 
-    if (cleanupError) {
-      throw cleanupError;
-    }
+      return {
+        source: keepaliveSource,
+        retentionDays,
+        heartbeatId
+      };
+    }, { optional: true });
+  }
 
-    return {
-      source: keepaliveSource,
-      retentionDays
-    };
-  }, { optional: true });
+  const storageObjectProbes = [
+    { table: "documents", bucket: "project-documents", pathColumn: "file_path" },
+    { table: "evidence_photos", bucket: "field-photos", pathColumn: "file_path" },
+    { table: "meeting_transcripts", bucket: "meeting-media", pathColumn: "audio_file_path" },
+    { table: "project_plans", bucket: "project-plans", pathColumn: "current_file_path" },
+    { table: "lidar_scans", bucket: "lidar-scans", pathColumn: "preview_image_path" }
+  ];
+
+  for (const probeConfig of storageObjectProbes) {
+    await probe(`signed-url-${probeConfig.table}`, async () => {
+      let query = supabase
+        .from(probeConfig.table)
+        .select(`${probeConfig.pathColumn}`)
+        .not(probeConfig.pathColumn, "is", null)
+        .limit(1);
+
+      if (targetProject?.id) {
+        query = query.eq("project_id", targetProject.id);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      const storagePath = data?.[0]?.[probeConfig.pathColumn];
+
+      if (!storagePath || /^https?:\/\//i.test(storagePath)) {
+        return {
+          table: probeConfig.table,
+          bucket: probeConfig.bucket,
+          skipped: true
+        };
+      }
+
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(probeConfig.bucket)
+        .createSignedUrl(storagePath, signedUrlTtlSeconds);
+
+      if (signedUrlError) {
+        throw signedUrlError;
+      }
+
+      return {
+        table: probeConfig.table,
+        bucket: probeConfig.bucket,
+        signedUrlCreated: Boolean(signedUrlData?.signedUrl)
+      };
+    }, { optional: true });
+  }
 
   if (shouldWriteStorage) {
     await probe("storage-write-delete-probe", async () => {
-      const objectPath = `keepalive/${keepaliveSource}/${startedAt.toISOString().slice(0, 10)}.json`;
+      const objectPath = `keepalive/${keepaliveSource}/${startedAt.toISOString().slice(0, 10)}/${runKey}.json`;
       const body = Buffer.from(
         JSON.stringify(
           {
             source: keepaliveSource,
             host: os.hostname(),
-            ranAt: startedAt.toISOString()
+            ranAt: startedAt.toISOString(),
+            projectSlug: projectSlug ?? targetProject?.slug ?? null,
+            mode: aggressiveMode ? "aggressive" : "standard"
           },
           null,
           2
@@ -326,6 +462,14 @@ async function main() {
         throw uploadError;
       }
 
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from(storageProbeBucket)
+        .createSignedUrl(objectPath, signedUrlTtlSeconds);
+
+      if (signedUrlError) {
+        throw signedUrlError;
+      }
+
       const { error: removeError } = await supabase.storage
         .from(storageProbeBucket)
         .remove([objectPath]);
@@ -336,7 +480,42 @@ async function main() {
 
       return {
         bucket: storageProbeBucket,
-        objectPath
+        objectPath,
+        signedUrlCreated: Boolean(signedUrlData?.signedUrl)
+      };
+    }, { optional: true });
+  }
+
+  if (shouldWriteDb && heartbeatId != null) {
+    await probe("keepalive-heartbeat-update", async () => {
+      const { error } = await supabase
+        .from("system_keepalive_events")
+        .update({
+          status: hadCriticalFailure ? "degraded" : warningCount > 0 ? "warning" : "ok",
+          details: {
+            runKey,
+            host: os.hostname(),
+            node: process.version,
+            projectSlug: projectSlug ?? targetProject?.slug ?? null,
+            startedAt: startedAt.toISOString(),
+            finishedAt: new Date().toISOString(),
+            probeCount: results.length,
+            warningCount,
+            errorCount,
+            mode: aggressiveMode ? "aggressive" : "standard"
+          }
+        })
+        .eq("id", heartbeatId);
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        heartbeatId,
+        probeCount: results.length,
+        warningCount,
+        errorCount
       };
     }, { optional: true });
   }
@@ -346,7 +525,10 @@ async function main() {
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     projectSlug: projectSlug ?? targetProject?.slug ?? null,
+    mode: aggressiveMode ? "aggressive" : "standard",
     hadCriticalFailure,
+    warningCount,
+    errorCount,
     results
   };
 
