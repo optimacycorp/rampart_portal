@@ -1,0 +1,228 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/documents/[documentId]/download",
+      "regex": "^/api/documents/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPdocumentId": "nxtPdocumentId"
+      },
+      "namedRegex": "^/api/documents/(?<nxtPdocumentId>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/api/exports/[exportKind]",
+      "regex": "^/api/exports/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPexportKind": "nxtPexportKind"
+      },
+      "namedRegex": "^/api/exports/(?<nxtPexportKind>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/photos/[photoId]/download",
+      "regex": "^/api/photos/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPphotoId": "nxtPphotoId"
+      },
+      "namedRegex": "^/api/photos/(?<nxtPphotoId>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/api/plans/[planId]/file",
+      "regex": "^/api/plans/([^/]+?)/file(?:/)?$",
+      "routeKeys": {
+        "nxtPplanId": "nxtPplanId"
+      },
+      "namedRegex": "^/api/plans/(?<nxtPplanId>[^/]+?)/file(?:/)?$"
+    },
+    {
+      "page": "/api/transcripts/[transcriptId]/download",
+      "regex": "^/api/transcripts/([^/]+?)/download(?:/)?$",
+      "routeKeys": {
+        "nxtPtranscriptId": "nxtPtranscriptId"
+      },
+      "namedRegex": "^/api/transcripts/(?<nxtPtranscriptId>[^/]+?)/download(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]",
+      "regex": "^/projects/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/access-log",
+      "regex": "^/projects/([^/]+?)/access\\-log(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/access\\-log(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/comments",
+      "regex": "^/projects/([^/]+?)/comments(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/comments(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/culverts",
+      "regex": "^/projects/([^/]+?)/culverts(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/culverts(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/documents",
+      "regex": "^/projects/([^/]+?)/documents(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/documents(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/documents/[documentId]",
+      "regex": "^/projects/([^/]+?)/documents/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId",
+        "nxtPdocumentId": "nxtPdocumentId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/documents/(?<nxtPdocumentId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/exports",
+      "regex": "^/projects/([^/]+?)/exports(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/exports(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/field-points",
+      "regex": "^/projects/([^/]+?)/field\\-points(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/field\\-points(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/field-points/import",
+      "regex": "^/projects/([^/]+?)/field\\-points/import(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/field\\-points/import(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/lidar",
+      "regex": "^/projects/([^/]+?)/lidar(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/lidar(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/lidar/[scanId]",
+      "regex": "^/projects/([^/]+?)/lidar/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId",
+        "nxtPscanId": "nxtPscanId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/lidar/(?<nxtPscanId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/map",
+      "regex": "^/projects/([^/]+?)/map(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/map(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/photos",
+      "regex": "^/projects/([^/]+?)/photos(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/photos(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/plans",
+      "regex": "^/projects/([^/]+?)/plans(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/plans(?:/)?$"
+    },
+    {
+      "page": "/projects/[projectId]/transcripts",
+      "regex": "^/projects/([^/]+?)/transcripts(?:/)?$",
+      "routeKeys": {
+        "nxtPprojectId": "nxtPprojectId"
+      },
+      "namedRegex": "^/projects/(?<nxtPprojectId>[^/]+?)/transcripts(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/projects",
+      "regex": "^/projects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/projects(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

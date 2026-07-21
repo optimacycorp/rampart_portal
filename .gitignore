@@ -1,0 +1,6 @@
+node_modules
+dist
+.env
+.env.local
+pnpm-lock.yaml
+tmp_wip_eval_pack
