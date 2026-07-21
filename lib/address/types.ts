@@ -1,0 +1,44 @@
+export type AddressCandidate = {
+  provider: "geoapify";
+  placeId: string;
+  formatted: string;
+  address1: string;
+  address2: string;
+  city: string;
+  county: string;
+  state: string;
+  stateCode: string;
+  postalCode: string;
+  country: string;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+  confidence: number | null;
+  resultType: string | null;
+  matchType: string | null;
+  raw: Record<string, unknown>;
+};
+
+export type AddressValidationResult = {
+  input: string;
+  provider: "geoapify";
+  validated: boolean;
+  confidence: number | null;
+  deliverability: "unknown";
+  formatted: string;
+  address1: string;
+  address2: string;
+  city: string;
+  county: string;
+  state: string;
+  stateCode: string;
+  postalCode: string;
+  country: string;
+  countryCode: string;
+  latitude: number | null;
+  longitude: number | null;
+  sourceId: string;
+  resultType: string | null;
+  matchType: string | null;
+  raw: Record<string, unknown>;
+};
