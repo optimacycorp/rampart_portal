@@ -7,7 +7,6 @@ import {
   refreshRoadStatusSources,
   refreshRoadWeather
 } from "@/app/projects/[projectId]/road/actions";
-import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssistant } from "@/components/ProjectAssistant";
 import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
@@ -241,10 +240,9 @@ export default async function RoadPage({
         title={`${project.name} road intelligence`}
         description="Track FS 0300 status, weather risk, alerts, source freshness, LiDAR-linked roadway measurements, and field evidence in one workspace."
       />
-      <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+      <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
         <strong>Road intelligence notice:</strong> {ROAD_INTELLIGENCE_DISCLAIMER}
       </div>
-      <DisclaimerBanner />
       <ProjectAssistant
         embedded
         projectSlug={projectId}
@@ -265,77 +263,68 @@ export default async function RoadPage({
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{feedbackText[query.error]}</div>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className={`rounded-[2rem] border p-6 shadow-card ${statusTone(currentStatus.partner_status ?? currentStatus.official_status)}`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em]">Primary corridor</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">{corridor.name}</h2>
-          <p className="mt-2 text-sm leading-6">
-            Managing agency: {corridor.managing_agency ?? "Pending"} | Road number: {corridor.road_number ?? "Pending"}
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
-              Official: {labelStatus(currentStatus.official_status)}
-            </span>
-            <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
-              Partner: {labelStatus(currentStatus.partner_status)}
-            </span>
-            <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
-              Risk: {labelRisk(currentStatus.overall_access_risk)}
-            </span>
-          </div>
-          <p className="mt-5 max-w-3xl text-sm leading-6">
-            {currentStatus.latest_condition_report ?? "No condition report summary has been stored yet. Refresh sources and add field reports to strengthen the current corridor picture."}
-          </p>
-        </div>
-
-        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 8 delivered</h2>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>The embedded road analysis assistant now answers road-specific status, weather-risk, field-report, LiDAR, and measurement questions with linked sources.</li>
-                <li>Road questions are routed through structured corridor data instead of relying only on generic project records.</li>
-                <li>LiDAR scans, roadway measurements, field evidence, alerts, and reports now work together as one road-intelligence surface.</li>
-                <li>This closes the first Road Intelligence phase with a queryable, evidence-linked coordination workspace.</li>
-              </ul>
+      <section className={`rounded-[2rem] border p-6 shadow-card ${statusTone(currentStatus.partner_status ?? currentStatus.official_status)}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em]">Primary corridor</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">{corridor.name}</h2>
+            <p className="mt-2 text-sm leading-6">
+              Managing agency: {corridor.managing_agency ?? "Pending"} | Road number: {corridor.road_number ?? "Pending"}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
+                Official: {labelStatus(currentStatus.official_status)}
+              </span>
+              <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
+                Partner: {labelStatus(currentStatus.partner_status)}
+              </span>
+              <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
+                Risk: {labelRisk(currentStatus.overall_access_risk)}
+              </span>
+              <span className="rounded-full bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm">
+                Gate: {labelGateStatus(currentStatus.gate_status)}
+              </span>
             </div>
-            {canRefresh ? (
-              <div className="flex flex-wrap gap-2">
-                <form action={snapshotAction}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clay/90"
-                  >
-                    Generate snapshot
-                  </button>
-                </form>
-                <form action={recalcAction}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-50"
-                  >
-                    Recalculate status
-                  </button>
-                </form>
-                <form action={refreshStatusAction}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-                  >
-                    Refresh status sources
-                  </button>
-                </form>
-                <form action={refreshAction}>
-                  <button
-                    type="submit"
-                    className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pine/90"
-                  >
-                    Refresh NWS data
-                  </button>
-                </form>
-              </div>
-            ) : null}
+            <p className="mt-5 text-sm leading-6">
+              {currentStatus.latest_condition_report ?? "No condition report summary has been stored yet. Refresh sources and add field reports to strengthen the current corridor picture."}
+            </p>
           </div>
+          {canRefresh ? (
+            <div className="flex flex-wrap gap-2">
+              <form action={refreshStatusAction}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                >
+                  Refresh status
+                </button>
+              </form>
+              <form action={refreshAction}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pine/90"
+                >
+                  Refresh weather
+                </button>
+              </form>
+              <form action={recalcAction}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-50"
+                >
+                  Recalculate
+                </button>
+              </form>
+              <form action={snapshotAction}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clay/90"
+                >
+                  Snapshot
+                </button>
+              </form>
+            </div>
+          ) : null}
         </div>
       </section>
 

@@ -19,7 +19,7 @@ export type UsfsAlertRecord = {
 };
 
 export type UsfsFetchResult = {
-  authoritativeStatus: "unknown" | "closed" | "restricted" | "seasonal_closure";
+  authoritativeStatus: "unknown" | "open" | "closed" | "restricted" | "seasonal_closure";
   summary: string;
   sourceUrl: string;
   rawStatusText: string;
@@ -35,7 +35,8 @@ function inferAlertType(title: string) {
   const normalized = title.toLowerCase();
 
   if (normalized.includes("fire restriction")) return "fire_restriction";
-  if (normalized.includes("closure")) return "emergency_closure";
+  if (normalized.includes("rampart") && normalized.includes("winter")) return "winter_closure";
+  if (normalized.includes("rampart") && normalized.includes("closure")) return "emergency_closure";
   if (normalized.includes("flood")) return "flood";
   if (normalized.includes("snow")) return "snow";
   if (normalized.includes("winter")) return "winter_closure";
@@ -75,6 +76,24 @@ function parseUsfsAlertLinks(html: string) {
 function parseRampartSeasonalClosureText(text: string) {
   const sentenceMatch = text.match(/During the winter months\s*\(December through April\)[^.]*\./i);
   return sentenceMatch ? normalizeWhitespace(sentenceMatch[0]) : null;
+}
+
+function isRampartSeasonalClosureActive(referenceDate = new Date()) {
+  const denverParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Denver",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  }).formatToParts(referenceDate);
+
+  const values = Object.fromEntries(denverParts.map((part) => [part.type, part.value]));
+  const month = Number(values.month ?? "0");
+  const day = Number(values.day ?? "0");
+
+  if (month === 12) return day >= 1;
+  if (month === 1 || month === 2 || month === 3) return true;
+  if (month === 4) return day <= 1;
+  return false;
 }
 
 export async function fetchUsfsRoadStatus() {
@@ -139,13 +158,20 @@ export async function fetchUsfsRoadStatus() {
 
   let authoritativeStatus: UsfsFetchResult["authoritativeStatus"] = "unknown";
   let summaryParts: string[] = [];
+  const seasonalClosureActive = seasonalClosureText ? isRampartSeasonalClosureActive() : false;
 
-  if (alerts.some((alert) => alert.alertType === "emergency_closure")) {
+  if (seasonalClosureActive) {
+    authoritativeStatus = "seasonal_closure";
+    summaryParts.push("Rampart Range Road is within the expected seasonal closure window (December 1 through April 1).");
+  } else if (alerts.some((alert) => alert.alertType === "emergency_closure")) {
     authoritativeStatus = "closed";
-    summaryParts.push("USFS active closure-related alert detected.");
+    summaryParts.push("USFS closure-related alert specific to Rampart was detected.");
   } else if (alerts.some((alert) => alert.alertType === "fire_restriction")) {
     authoritativeStatus = "restricted";
     summaryParts.push("USFS fire restriction information detected.");
+  } else if (seasonalClosureText) {
+    authoritativeStatus = "open";
+    summaryParts.push("Rampart Range Road is outside the seasonal closure window described by the USFS recreation page.");
   }
 
   if (seasonalClosureText) {
