@@ -6,6 +6,7 @@ import {
   seededRoadCurrentStatus,
   seededRoadDailySnapshots,
   seededRoadDataSources,
+  seededRoadWeatherSnapshots,
   seededRoadWeatherLocations
 } from "@/lib/mock-data";
 import { getProjectBySlug } from "@/lib/documents";
@@ -16,6 +17,7 @@ import {
   RoadCurrentStatus,
   RoadDailySnapshot,
   RoadDataSource,
+  RoadWeatherLocationSnapshot,
   RoadWeatherLocation
 } from "@/lib/types";
 
@@ -25,6 +27,7 @@ type RoadOverviewSnapshot = {
   sources: RoadDataSource[];
   activeAlerts: RoadClosureAlert[];
   weatherLocations: RoadWeatherLocation[];
+  weatherSnapshots: RoadWeatherLocationSnapshot[];
   latestSnapshot: RoadDailySnapshot | null;
 };
 
@@ -39,6 +42,7 @@ function fallbackOverview(projectId: string): RoadOverviewSnapshot | null {
     sources: seededRoadDataSources,
     activeAlerts: seededRoadAlerts.filter((alert) => alert.active),
     weatherLocations: seededRoadWeatherLocations,
+    weatherSnapshots: seededRoadWeatherSnapshots,
     latestSnapshot: seededRoadDailySnapshots[0] ?? null
   };
 }
@@ -104,13 +108,46 @@ export async function getRoadOverviewByProjectSlug(projectSlug: string): Promise
       .limit(1)
   ]);
 
+  const weatherLocations = (weatherLocationsResult.data as RoadWeatherLocation[] | null) ?? fallback?.weatherLocations ?? seededRoadWeatherLocations;
+  const weatherSnapshots = await Promise.all(
+    weatherLocations.map(async (location) => {
+      const [observationResult, forecastResult] = await Promise.all([
+        supabase
+          .from("weather_observations")
+          .select(
+            "id, location_id, source_id, observed_at, temperature_f, dewpoint_f, relative_humidity_percent, wind_speed_mph, wind_gust_mph, wind_direction_deg, precipitation_1h_in, precipitation_24h_in, snow_depth_in, visibility_miles, pressure_mb, weather_description, raw_payload, fetched_at"
+          )
+          .eq("location_id", location.id)
+          .order("observed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("weather_forecasts")
+          .select(
+            "id, location_id, source_id, forecast_generated_at, period_start, period_end, temperature_f, precipitation_probability, snowfall_inches, wind_speed_mph, wind_gust_mph, short_forecast, detailed_forecast, raw_payload, fetched_at"
+          )
+          .eq("location_id", location.id)
+          .gte("period_end", new Date().toISOString())
+          .order("period_start", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      ]);
+
+      return {
+        location,
+        latestObservation: observationResult.data ?? null,
+        nextForecast: forecastResult.data ?? null
+      };
+    })
+  );
+
   return {
     corridor: corridor as RoadCorridor,
     currentStatus: (currentStatusResult.data as RoadCurrentStatus | null) ?? fallback?.currentStatus ?? seededRoadCurrentStatus,
     sources: (sourcesResult.data as RoadDataSource[] | null) ?? fallback?.sources ?? seededRoadDataSources,
     activeAlerts: (alertsResult.data as RoadClosureAlert[] | null) ?? fallback?.activeAlerts ?? [],
-    weatherLocations:
-      (weatherLocationsResult.data as RoadWeatherLocation[] | null) ?? fallback?.weatherLocations ?? seededRoadWeatherLocations,
+    weatherLocations,
+    weatherSnapshots,
     latestSnapshot:
       (snapshotsResult.data?.[0] as RoadDailySnapshot | undefined) ?? fallback?.latestSnapshot ?? seededRoadDailySnapshots[0] ?? null
   };

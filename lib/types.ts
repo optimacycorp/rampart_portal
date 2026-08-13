@@ -566,3 +566,9 @@ export type RoadCurrentStatus = {
   overall_access_risk?: OverallAccessRisk | null;
   last_updated?: string | null;
 };
+
+export type RoadWeatherLocationSnapshot = {
+  location: RoadWeatherLocation;
+  latestObservation: WeatherObservation | null;
+  nextForecast: WeatherForecast | null;
+};

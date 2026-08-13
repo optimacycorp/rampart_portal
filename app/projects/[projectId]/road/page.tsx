@@ -1,3 +1,5 @@
+import { refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
@@ -57,12 +59,19 @@ function freshnessTone(lastSuccessAt?: string | null) {
 }
 
 export default async function RoadPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ status?: string; error?: string }>;
 }) {
   const { projectId } = await params;
-  const [project, overview] = await Promise.all([getProjectBySlug(projectId), getRoadOverviewByProjectSlug(projectId)]);
+  const query = await searchParams;
+  const [{ role }, project, overview] = await Promise.all([
+    getCurrentUserContext(),
+    getProjectBySlug(projectId),
+    getRoadOverviewByProjectSlug(projectId)
+  ]);
 
   if (!project) {
     return (
@@ -87,7 +96,18 @@ export default async function RoadPage({
     );
   }
 
-  const { corridor, currentStatus, activeAlerts, latestSnapshot, sources, weatherLocations } = overview;
+  const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
+  const canRefresh = role === "owner" || role === "audit";
+  const refreshAction = refreshRoadWeather.bind(null, projectId);
+  const feedbackText: Record<string, string> = {
+    "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
+    "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
+    forbidden: "Only owner or audit users can refresh road intelligence sources.",
+    "project-not-found": "The requested project or road corridor could not be found.",
+    "nws-source-not-found": "The NWS road-data source record is missing. Run the latest road migrations first.",
+    "refresh-start-failed": "The portal could not create the NWS ingestion run record.",
+    "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details."
+  };
 
   const cards = [
     {
@@ -146,6 +166,12 @@ export default async function RoadPage({
         <strong>Road intelligence notice:</strong> {ROAD_INTELLIGENCE_DISCLAIMER}
       </div>
       <DisclaimerBanner />
+      {query.status && feedbackText[query.status] ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{feedbackText[query.status]}</div>
+      ) : null}
+      {query.error && feedbackText[query.error] ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{feedbackText[query.error]}</div>
+      ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className={`rounded-[2rem] border p-6 shadow-card ${statusTone(currentStatus.partner_status ?? currentStatus.official_status)}`}>
@@ -172,13 +198,27 @@ export default async function RoadPage({
         </div>
 
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-          <h2 className="text-xl font-semibold text-ink">Sprint 1 delivered</h2>
-          <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <li>Road intelligence schema and current-status view ready for Supabase migration.</li>
-            <li>Primary FS 0300 corridor seed and provider registry foundations added.</li>
-            <li>New project road workspace route and top navigation entry enabled.</li>
-            <li>Fallback seeded cards keep the page useful before automated ingestion begins.</li>
-          </ul>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Sprint 2 delivered</h2>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <li>NWS point discovery, observations, forecasts, and active alerts wired into the portal.</li>
+                <li>Manual owner/audit refresh creates audited `road_ingestion_runs` records.</li>
+                <li>Per-location weather snapshots now render from stored Supabase records.</li>
+                <li>Active weather alerts remain distinct from legal road-status determinations.</li>
+              </ul>
+            </div>
+            {canRefresh ? (
+              <form action={refreshAction}>
+                <button
+                  type="submit"
+                  className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pine/90"
+                >
+                  Refresh NWS data
+                </button>
+              </form>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -255,13 +295,34 @@ export default async function RoadPage({
             <h2 className="text-xl font-semibold text-ink">Weather sampling sites</h2>
             <p className="mt-2 text-sm text-slate-600">Multiple elevation-aware sample points avoid collapsing the entire corridor into one Colorado Springs weather reading.</p>
             <div className="mt-5 space-y-3">
-              {weatherLocations.map((location) => (
-                <div key={location.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <p className="font-semibold text-slate-800">{location.name}</p>
+              {overview.weatherSnapshots.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  No weather-location records are registered yet for this corridor.
+                </div>
+              ) : null}
+              {overview.weatherSnapshots.map((snapshot) => (
+                <div key={snapshot.location.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-800">{snapshot.location.name}</p>
                   <p className="mt-1">
-                    {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)} | Elev. {location.elevation_ft ?? "?"} ft
+                    {snapshot.location.latitude.toFixed(4)}, {snapshot.location.longitude.toFixed(4)} | Elev. {snapshot.location.elevation_ft ?? "?"} ft
                   </p>
-                  <p className="mt-1 text-slate-500">Station id: {location.station_identifier ?? "Pending"}</p>
+                  <p className="mt-1 text-slate-500">Station id: {snapshot.location.station_identifier ?? "Pending"}</p>
+                  <div className="mt-3 grid gap-1 text-slate-600">
+                    <p>
+                      Observation: {snapshot.latestObservation?.temperature_f != null ? `${snapshot.latestObservation.temperature_f} F` : "Unknown"}{" "}
+                      | {snapshot.latestObservation?.weather_description ?? "No description"}
+                    </p>
+                    <p>
+                      Wind: {snapshot.latestObservation?.wind_speed_mph ?? "?"} mph | Gust {snapshot.latestObservation?.wind_gust_mph ?? "?"} mph
+                    </p>
+                    <p>
+                      Forecast: {snapshot.nextForecast?.short_forecast ?? "Pending"} | POP{" "}
+                      {snapshot.nextForecast?.precipitation_probability ?? "?"}%
+                    </p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Obs {formatDateTime(snapshot.latestObservation?.observed_at)} | Forecast {formatDateTime(snapshot.nextForecast?.period_start)}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

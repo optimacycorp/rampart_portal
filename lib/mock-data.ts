@@ -9,6 +9,7 @@ import {
   RoadCurrentStatus,
   RoadDataSource,
   RoadDailySnapshot,
+  RoadWeatherLocationSnapshot,
   RoadWeatherLocation,
   WeatherForecast,
   WeatherObservation,
@@ -509,3 +510,21 @@ export const seededRoadCurrentStatus: RoadCurrentStatus = {
   overall_access_risk: "moderate",
   last_updated: new Date("2026-08-13T09:05:00-06:00").toISOString()
 };
+
+export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededRoadWeatherLocations.map((location) => ({
+  location,
+  latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
+  nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
+}));
+
+export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededRoadWeatherLocations.map((location) => ({
+  location,
+  latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
+  nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
+}));
+
+export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededRoadWeatherLocations.map((location) => ({
+  location,
+  latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
+  nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
+}));
