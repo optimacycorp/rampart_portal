@@ -56,6 +56,13 @@ function normalizeString(value) {
   return `${value ?? ""}`.trim();
 }
 
+function readIntEnv(name, fallback) {
+  const raw = normalizeString(process.env[name]);
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function readJsonObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -156,29 +163,45 @@ function simpleExternalId(prefix, seed) {
 }
 
 async function fetchJson(url, headers) {
-  const response = await fetch(url, {
-    headers,
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}) for ${url}`);
-  }
-
-  return response.json();
+  return fetchWithRetry(url, headers, "json");
 }
 
 async function fetchText(url, headers) {
-  const response = await fetch(url, {
-    headers,
-    cache: "no-store"
-  });
+  return fetchWithRetry(url, headers, "text");
+}
 
-  if (!response.ok) {
-    throw new Error(`Request failed (${response.status}) for ${url}`);
+async function fetchWithRetry(url, headers, responseType) {
+  const timeoutMs = readIntEnv("ROAD_INTEL_FETCH_TIMEOUT_MS", 20000);
+  const retryCount = readIntEnv("ROAD_INTEL_FETCH_RETRIES", 2);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= retryCount + 1; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status}) for ${url}`);
+      }
+
+      return responseType === "json" ? response.json() : response.text();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt > retryCount) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    }
   }
 
-  return response.text();
+  throw lastError instanceof Error
+    ? new Error(`${lastError.message} [url=${url}]`)
+    : new Error(`Request failed for ${url}`);
 }
 
 async function fetchNwsForPoint(latitude, longitude) {
@@ -743,117 +766,143 @@ async function refreshRoadStatusSources(supabase, overview) {
     corridor_id: overview.corridor.id
   });
 
-  try {
-    const [rrmmc, usfs] = await Promise.all([fetchRrmmcRoadStatus(), fetchUsfsRoadStatus()]);
+  const result = {
+    rrmmcStatus: null,
+    rrmmcError: null,
+    usfsStatus: null,
+    usfsAlertCount: 0,
+    usfsError: null
+  };
 
-    const rrmmcInsert = await supabase.from("road_status_observations").insert({
-      corridor_id: overview.corridor.id,
-      source_id: rrmmcSource.id,
-      observed_at: toIsoNow(),
-      fetched_at: toIsoNow(),
-      status: mapRoadStatus(rrmmc.roadStatus),
-      gate_status: "unknown",
-      summary: rrmmc.summary,
-      raw_status_text: rrmmc.rawStatusText,
-      source_url: rrmmc.sourceUrl,
-      confidence: 0.7,
-      official: false,
-      raw_payload: rrmmc.rawPayload
-    });
+  const rrmmcOutcome = await fetchRrmmcRoadStatus()
+    .then(async (rrmmc) => {
+      const rrmmcInsert = await supabase.from("road_status_observations").insert({
+        corridor_id: overview.corridor.id,
+        source_id: rrmmcSource.id,
+        observed_at: toIsoNow(),
+        fetched_at: toIsoNow(),
+        status: mapRoadStatus(rrmmc.roadStatus),
+        gate_status: "unknown",
+        summary: rrmmc.summary,
+        raw_status_text: rrmmc.rawStatusText,
+        source_url: rrmmc.sourceUrl,
+        confidence: 0.7,
+        official: false,
+        raw_payload: rrmmc.rawPayload
+      });
 
-    if (rrmmcInsert.error) throw rrmmcInsert.error;
+      if (rrmmcInsert.error) throw rrmmcInsert.error;
 
-    await updateSourceSuccess(supabase, rrmmcSource.id, "rrmmc-cron-v1");
-    await markRunSuccess(supabase, rrmmcRunId, {
-      records_received: 1,
-      records_inserted: 1,
-      records_updated: 0,
-      http_status: 200,
-      metadata: {
-        road_status: rrmmc.roadStatus,
-        trail_status: rrmmc.trailStatus
-      }
-    });
-
-    await supabase
-      .from("road_closures_alerts")
-      .update({
-        active: false,
-        updated_at: toIsoNow()
-      })
-      .eq("corridor_id", overview.corridor.id)
-      .eq("source_id", usfsSource.id);
-
-    const usfsObservationInsert = await supabase.from("road_status_observations").insert({
-      corridor_id: overview.corridor.id,
-      source_id: usfsSource.id,
-      observed_at: toIsoNow(),
-      fetched_at: toIsoNow(),
-      status: usfs.authoritativeStatus,
-      gate_status: "unknown",
-      summary: usfs.summary,
-      raw_status_text: usfs.rawStatusText,
-      source_url: usfs.sourceUrl,
-      confidence: 0.85,
-      official: true,
-      raw_payload: {
-        raw_status_text: usfs.rawStatusText
-      }
-    });
-
-    if (usfsObservationInsert.error) throw usfsObservationInsert.error;
-
-    if (usfs.alerts.length > 0) {
-      const alertUpsert = await supabase.from("road_closures_alerts").upsert(
-        usfs.alerts.map((alert) => ({
-          corridor_id: overview.corridor.id,
-          source_id: usfsSource.id,
-          external_alert_id: alert.externalAlertId,
-          alert_type: alert.alertType,
-          severity: alert.severity,
-          title: alert.title,
-          description: alert.description,
-          effective_at: alert.effectiveAt,
-          expires_at: alert.expiresAt,
-          active: true,
-          source_url: alert.sourceUrl,
-          raw_payload: alert.rawPayload,
-          updated_at: toIsoNow()
-        })),
-        {
-          onConflict: "source_id,external_alert_id",
-          ignoreDuplicates: false
+      await updateSourceSuccess(supabase, rrmmcSource.id, "rrmmc-cron-v1");
+      await markRunSuccess(supabase, rrmmcRunId, {
+        records_received: 1,
+        records_inserted: 1,
+        records_updated: 0,
+        http_status: 200,
+        metadata: {
+          road_status: rrmmc.roadStatus,
+          trail_status: rrmmc.trailStatus
         }
-      );
+      });
 
-      if (alertUpsert.error) throw alertUpsert.error;
-    }
-
-    await updateSourceSuccess(supabase, usfsSource.id, "usfs-cron-v1");
-    await markRunSuccess(supabase, usfsRunId, {
-      records_received: 1 + usfs.alerts.length,
-      records_inserted: 1 + usfs.alerts.length,
-      records_updated: 0,
-      http_status: 200,
-      metadata: {
-        authoritative_status: usfs.authoritativeStatus,
-        alert_count: usfs.alerts.length
-      }
+      result.rrmmcStatus = rrmmc.roadStatus;
+      return true;
+    })
+    .catch(async (error) => {
+      const message = error instanceof Error ? error.message : "Unexpected RRMMC refresh failure.";
+      result.rrmmcError = message;
+      await updateSourceAttempt(supabase, rrmmcSource.id);
+      await markRunFailure(supabase, rrmmcRunId, message);
+      return false;
     });
 
-    return {
-      rrmmcStatus: rrmmc.roadStatus,
-      usfsStatus: usfs.authoritativeStatus,
-      usfsAlertCount: usfs.alerts.length
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected road status refresh failure.";
-    await updateSourceAttempt(supabase, rrmmcSource.id);
-    await updateSourceAttempt(supabase, usfsSource.id);
-    await markRunFailure(supabase, rrmmcRunId, message);
-    await markRunFailure(supabase, usfsRunId, message);
-    throw error;
+  const usfsOutcome = await fetchUsfsRoadStatus()
+    .then(async (usfs) => {
+      await supabase
+        .from("road_closures_alerts")
+        .update({
+          active: false,
+          updated_at: toIsoNow()
+        })
+        .eq("corridor_id", overview.corridor.id)
+        .eq("source_id", usfsSource.id);
+
+      const usfsObservationInsert = await supabase.from("road_status_observations").insert({
+        corridor_id: overview.corridor.id,
+        source_id: usfsSource.id,
+        observed_at: toIsoNow(),
+        fetched_at: toIsoNow(),
+        status: usfs.authoritativeStatus,
+        gate_status: "unknown",
+        summary: usfs.summary,
+        raw_status_text: usfs.rawStatusText,
+        source_url: usfs.sourceUrl,
+        confidence: 0.85,
+        official: true,
+        raw_payload: {
+          raw_status_text: usfs.rawStatusText
+        }
+      });
+
+      if (usfsObservationInsert.error) throw usfsObservationInsert.error;
+
+      if (usfs.alerts.length > 0) {
+        const alertUpsert = await supabase.from("road_closures_alerts").upsert(
+          usfs.alerts.map((alert) => ({
+            corridor_id: overview.corridor.id,
+            source_id: usfsSource.id,
+            external_alert_id: alert.externalAlertId,
+            alert_type: alert.alertType,
+            severity: alert.severity,
+            title: alert.title,
+            description: alert.description,
+            effective_at: alert.effectiveAt,
+            expires_at: alert.expiresAt,
+            active: true,
+            source_url: alert.sourceUrl,
+            raw_payload: alert.rawPayload,
+            updated_at: toIsoNow()
+          })),
+          {
+            onConflict: "source_id,external_alert_id",
+            ignoreDuplicates: false
+          }
+        );
+
+        if (alertUpsert.error) throw alertUpsert.error;
+      }
+
+      await updateSourceSuccess(supabase, usfsSource.id, "usfs-cron-v1");
+      await markRunSuccess(supabase, usfsRunId, {
+        records_received: 1 + usfs.alerts.length,
+        records_inserted: 1 + usfs.alerts.length,
+        records_updated: 0,
+        http_status: 200,
+        metadata: {
+          authoritative_status: usfs.authoritativeStatus,
+          alert_count: usfs.alerts.length
+        }
+      });
+
+      result.usfsStatus = usfs.authoritativeStatus;
+      result.usfsAlertCount = usfs.alerts.length;
+      return true;
+    })
+    .catch(async (error) => {
+      const message = error instanceof Error ? error.message : "Unexpected USFS refresh failure.";
+      result.usfsError = message;
+      await updateSourceAttempt(supabase, usfsSource.id);
+      await markRunFailure(supabase, usfsRunId, message);
+      return false;
+    });
+
+  if (!rrmmcOutcome && !usfsOutcome) {
+    throw new Error(
+      `Both road status sources failed. RRMMC: ${result.rrmmcError ?? "unknown"} | USFS: ${result.usfsError ?? "unknown"}`
+    );
   }
+
+  return result;
 }
 
 async function recalculateRoadStatus(supabase, overview) {

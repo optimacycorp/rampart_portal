@@ -12,6 +12,8 @@ RUN_BUILD="${RUN_BUILD:-false}"
 RUN_TEST_CALL="${RUN_TEST_CALL:-true}"
 ROAD_INTELLIGENCE_PROJECT_SLUG_VALUE="${ROAD_INTELLIGENCE_PROJECT_SLUG_VALUE:-3245-rampart-range-road}"
 ROAD_INTELLIGENCE_REFRESH_MODE_VALUE="${ROAD_INTELLIGENCE_REFRESH_MODE_VALUE:-all}"
+ROAD_INTEL_FETCH_TIMEOUT_MS_VALUE="${ROAD_INTEL_FETCH_TIMEOUT_MS_VALUE:-20000}"
+ROAD_INTEL_FETCH_RETRIES_VALUE="${ROAD_INTEL_FETCH_RETRIES_VALUE:-2}"
 CRON_MARKER_BEGIN="# BEGIN rampart-road-intelligence-refresh"
 CRON_MARKER_END="# END rampart-road-intelligence-refresh"
 
@@ -42,19 +44,23 @@ if [[ "$RUN_BUILD" == "true" ]]; then
   "$NPM_BIN" run build
 fi
 
-python3 - "$ENV_FILE" "$ROAD_INTELLIGENCE_PROJECT_SLUG_VALUE" "$ROAD_INTELLIGENCE_REFRESH_MODE_VALUE" <<'PY'
+python3 - "$ENV_FILE" "$ROAD_INTELLIGENCE_PROJECT_SLUG_VALUE" "$ROAD_INTELLIGENCE_REFRESH_MODE_VALUE" "$ROAD_INTEL_FETCH_TIMEOUT_MS_VALUE" "$ROAD_INTEL_FETCH_RETRIES_VALUE" <<'PY'
 import pathlib
 import sys
 
 env_path = pathlib.Path(sys.argv[1])
 project_slug = sys.argv[2]
 refresh_mode = sys.argv[3]
+fetch_timeout_ms = sys.argv[4]
+fetch_retries = sys.argv[5]
 text = env_path.read_text(encoding="utf-8")
 lines = text.splitlines()
 
 required = {
     "ROAD_INTELLIGENCE_PROJECT_SLUG": project_slug,
     "ROAD_INTELLIGENCE_REFRESH_MODE": refresh_mode,
+    "ROAD_INTEL_FETCH_TIMEOUT_MS": fetch_timeout_ms,
+    "ROAD_INTEL_FETCH_RETRIES": fetch_retries,
 }
 
 existing_keys = set()
