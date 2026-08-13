@@ -40,7 +40,8 @@ function AssistantBody({
   setQuestion,
   loading,
   response,
-  onAsk
+  onAsk,
+  starterQuestions
 }: {
   question: string;
   setQuestion: (value: string) => void;
