@@ -89,3 +89,27 @@ export const ROAD_RISK_LABELS = {
   severe: "Severe",
   unknown: "Unknown"
 } as const;
+
+export const ROAD_PASSABILITY_OPTIONS = [
+  "passable_2wd",
+  "high_clearance_recommended",
+  "4wd_recommended",
+  "4wd_required",
+  "not_passable",
+  "unknown"
+] as const;
+
+export const ROAD_SURFACE_CONDITION_OPTIONS = [
+  "dry",
+  "damp",
+  "muddy",
+  "snow_packed",
+  "icy",
+  "rutted",
+  "washed_out",
+  "rocky",
+  "standing_water",
+  "unknown"
+] as const;
+
+export const ROAD_SEVERITY_OPTIONS = ["none", "low", "moderate", "high", "severe", "unknown"] as const;

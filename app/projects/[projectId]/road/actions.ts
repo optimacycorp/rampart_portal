@@ -8,6 +8,8 @@ import { getRecentRoadDailySnapshots } from "@/lib/road-history";
 import { fetchNwsForPoint } from "@/lib/nws";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
 import { getRecentRoadStatusEvents, getRoadCurrentStatusByCorridorId } from "@/lib/road-reconciliation";
+import { getEvidencePhotoById } from "@/lib/evidence-photos";
+import { getFieldPointById } from "@/lib/field-points";
 import { fetchRrmmcRoadStatus, mapRrmmcRoadStatus } from "@/lib/rrmmc";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { fetchUsfsRoadStatus } from "@/lib/usfs";
@@ -20,6 +22,26 @@ async function requireRoadRefreshRole() {
   }
 
   return { user, role };
+}
+
+function readFormString(formData: FormData, key: string) {
+  const value = `${formData.get(key) ?? ""}`.trim();
+  return value || null;
+}
+
+function readFormNumber(formData: FormData, key: string) {
+  const value = readFormString(formData, key);
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readFormBoolean(formData: FormData, key: string) {
+  return formData.get(key) === "true";
 }
 
 export async function refreshRoadWeather(projectSlug: string) {
@@ -628,4 +650,73 @@ export async function generateRoadSnapshot(projectSlug: string) {
 
   revalidatePath(`/projects/${projectSlug}/road`);
   redirect(`/projects/${projectSlug}/road?status=snapshot-generated`);
+}
+
+export async function createRoadConditionReport(projectSlug: string, formData: FormData) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/road?error=supabase-not-configured`);
+  }
+
+  const [{ user }, overview] = await Promise.all([getCurrentUserContext(), getRoadOverviewByProjectSlug(projectSlug)]);
+
+  if (!user || !overview) {
+    redirect(`/projects/${projectSlug}/road?error=project-not-found`);
+  }
+
+  const observedAt = readFormString(formData, "observed_at");
+  const condition = readFormString(formData, "condition");
+  const description = readFormString(formData, "description");
+  const photoId = readFormString(formData, "photo_id");
+  const linkedPointId = readFormString(formData, "linked_point_id");
+
+  if (!observedAt || !condition || !description) {
+    redirect(`/projects/${projectSlug}/road?error=report-missing-required-fields`);
+  }
+
+  if (photoId) {
+    const photo = await getEvidencePhotoById(photoId);
+    if (!photo) {
+      redirect(`/projects/${projectSlug}/road?error=photo-not-found`);
+    }
+  }
+
+  if (linkedPointId) {
+    const point = await getFieldPointById(linkedPointId);
+    if (!point) {
+      redirect(`/projects/${projectSlug}/road?error=point-not-found`);
+    }
+  }
+
+  const { error } = await supabase.from("road_condition_reports").insert({
+    corridor_id: overview.corridor.id,
+    report_source: "portal_user",
+    reported_by: user.id,
+    observed_at: observedAt,
+    condition,
+    surface_condition: readFormString(formData, "surface_condition"),
+    mud_severity: readFormString(formData, "mud_severity"),
+    snow_severity: readFormString(formData, "snow_severity"),
+    rut_severity: readFormString(formData, "rut_severity"),
+    washout: readFormBoolean(formData, "washout"),
+    fallen_tree: readFormBoolean(formData, "fallen_tree"),
+    standing_water: readFormBoolean(formData, "standing_water"),
+    erosion: readFormBoolean(formData, "erosion"),
+    passability: readFormString(formData, "passability"),
+    recommended_vehicle: readFormString(formData, "recommended_vehicle"),
+    description,
+    latitude: readFormNumber(formData, "latitude"),
+    longitude: readFormNumber(formData, "longitude"),
+    photo_id: photoId,
+    source_url: null,
+    verified: false
+  });
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/road?error=report-save-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/road`);
+  redirect(`/projects/${projectSlug}/road?status=report-saved`);
 }

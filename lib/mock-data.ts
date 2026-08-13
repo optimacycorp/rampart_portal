@@ -5,6 +5,7 @@ import {
   FieldPoint,
   MeetingTranscript,
   RoadClosureAlert,
+  RoadConditionReport,
   RoadCorridor,
   RoadCurrentStatus,
   RoadDataSource,
@@ -516,3 +517,53 @@ export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededR
   latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
   nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
 }));
+
+export const seededRoadConditionReports: RoadConditionReport[] = [
+  {
+    id: "road-report-1",
+    corridor_id: seededRoadCorridor.id,
+    report_source: "portal_user",
+    reported_by: "demo-owner",
+    observed_at: new Date("2026-08-12T15:30:00-06:00").toISOString(),
+    condition: "Caution near drainage crossing",
+    surface_condition: "rutted",
+    mud_severity: "low",
+    snow_severity: "none",
+    rut_severity: "moderate",
+    washout: false,
+    fallen_tree: false,
+    standing_water: false,
+    erosion: true,
+    passability: "high_clearance_recommended",
+    recommended_vehicle: "High-clearance SUV or pickup",
+    description: "Minor rutting and shoulder erosion near the culvert crossing. Passable, but low-clearance vehicles should use caution after storms.",
+    latitude: 38.9223,
+    longitude: -104.6184,
+    photo_id: "photo-2",
+    verified: true,
+    created_at: new Date("2026-08-12T16:10:00-06:00").toISOString()
+  },
+  {
+    id: "road-report-2",
+    corridor_id: seededRoadCorridor.id,
+    report_source: "portal_user",
+    reported_by: "demo-owner",
+    observed_at: new Date("2026-08-10T10:15:00-06:00").toISOString(),
+    condition: "Afternoon thunderstorm runoff",
+    surface_condition: "damp",
+    mud_severity: "moderate",
+    snow_severity: "none",
+    rut_severity: "low",
+    washout: false,
+    fallen_tree: false,
+    standing_water: true,
+    erosion: false,
+    passability: "4wd_recommended",
+    recommended_vehicle: "4WD recommended if additional rain arrives",
+    description: "Runoff pooled briefly at the inside turn. Still passable, but softer shoulders were forming by late afternoon.",
+    latitude: 38.9241,
+    longitude: -104.6202,
+    verified: false,
+    created_at: new Date("2026-08-10T10:40:00-06:00").toISOString()
+  }
+];

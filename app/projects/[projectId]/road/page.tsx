@@ -1,5 +1,7 @@
 import { generateRoadSnapshot, recalculateRoadStatus, refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
+import { createRoadConditionReport } from "@/app/projects/[projectId]/road/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
@@ -7,7 +9,10 @@ import { getProjectBySlug } from "@/lib/documents";
 import { getRecentRoadDailySnapshots, getRoadSourceHealth } from "@/lib/road-history";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
 import { getRecentRoadStatusEvents } from "@/lib/road-reconciliation";
+import { getRoadConditionReportsByCorridorId } from "@/lib/road-reports";
 import { GateStatus, OverallAccessRisk, RoadStatus } from "@/lib/types";
+import { getEvidencePhotosByProjectSlug } from "@/lib/evidence-photos";
+import { getFieldPointsByProjectSlug } from "@/lib/field-points";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "Not reported";
@@ -114,21 +119,26 @@ export default async function RoadPage({
   }
 
   const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
-  const [recentEvents, recentSnapshots, sourceHealth] = await Promise.all([
+  const [recentEvents, recentSnapshots, sourceHealth, roadReports, fieldPoints, photos] = await Promise.all([
     getRecentRoadStatusEvents(corridor.id, 6),
     getRecentRoadDailySnapshots(corridor.id, 10),
-    getRoadSourceHealth(corridor.id)
+    getRoadSourceHealth(corridor.id),
+    getRoadConditionReportsByCorridorId(corridor.id, 12),
+    getFieldPointsByProjectSlug(projectId),
+    getEvidencePhotosByProjectSlug(projectId)
   ]);
   const canRefresh = role === "owner" || role === "audit";
   const refreshAction = refreshRoadWeather.bind(null, projectId);
   const refreshStatusAction = refreshRoadStatusSources.bind(null, projectId);
   const recalcAction = recalculateRoadStatus.bind(null, projectId);
   const snapshotAction = generateRoadSnapshot.bind(null, projectId);
+  const reportAction = createRoadConditionReport.bind(null, projectId);
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
     "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
     recalculated: "The deterministic reconciliation engine recalculated consolidated road status and logged a status event.",
     "snapshot-generated": "A daily road snapshot was generated from the current reconciled status and weather evidence.",
+    "report-saved": "Road condition report saved. It is marked as a user observation until explicitly verified.",
     "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
     forbidden: "Only owner or audit users can refresh road intelligence sources.",
     "project-not-found": "The requested project or road corridor could not be found.",
@@ -138,7 +148,11 @@ export default async function RoadPage({
     "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details.",
     "status-refresh-failed": "The USFS or RRMMC refresh failed. Check the road_ingestion_runs table for the error details.",
     "recalculation-failed": "The portal could not log the reconciliation result. Check road_status_events and the current-status view.",
-    "snapshot-failed": "The portal could not write the road snapshot. Check road_daily_snapshots and current road status data."
+    "snapshot-failed": "The portal could not write the road snapshot. Check road_daily_snapshots and current road status data.",
+    "report-missing-required-fields": "Observed date/time, condition summary, and report notes are required.",
+    "report-save-failed": "The road condition report could not be saved.",
+    "photo-not-found": "The selected linked photo could not be found.",
+    "point-not-found": "The selected linked field point could not be found."
   };
 
   const cards = [
@@ -238,12 +252,12 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 5 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 6 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>Manual daily snapshot generation now writes historical road intelligence rows into `road_daily_snapshots`.</li>
-                <li>Source health now summarizes each provider’s latest run, failures, and freshness state.</li>
-                <li>The Road page now shows snapshot history and ingestion health alongside live intelligence.</li>
-                <li>This sets up the historical dashboard and source admin tools for the next phase.</li>
+                <li>Authorized users can now log field road-condition reports with passability, severity, GPS, and evidence links.</li>
+                <li>Road reports are stored separately as user observations, not authoritative closures or safety determinations.</li>
+                <li>The Road page now shows a recent field-report feed alongside live intelligence and historical snapshots.</li>
+                <li>This gives the portal its first true field-evidence workflow for road conditions.</li>
               </ul>
             </div>
             {canRefresh ? (
@@ -282,6 +296,77 @@ export default async function RoadPage({
                 </form>
               </div>
             ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+          <h2 className="text-xl font-semibold text-ink">Report road condition</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Log field observations such as runoff, rutting, washouts, tree obstructions, standing water, or passability concerns. These reports remain user observations until explicitly verified.
+          </p>
+          <div className="mt-5">
+            <RoadConditionReportForm action={reportAction} fieldPoints={fieldPoints} photos={photos} />
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Recent field road reports</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                These are portal user observations for coordination only. They do not replace USFS closures, restrictions, or other authoritative determinations.
+              </p>
+            </div>
+            <span className="text-sm text-slate-500">{roadReports.length} reports</span>
+          </div>
+          <div className="mt-5 space-y-4">
+            {roadReports.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                No field road reports have been logged yet.
+              </div>
+            ) : (
+              roadReports.map((report) => (
+                <article key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-800">{report.condition ?? "Road condition report"}</p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {formatDateTime(report.observed_at)} | Passability: {(report.passability ?? "unknown").replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        report.verified ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      {report.verified ? "Verified" : "User observation"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                    <p>Surface: {(report.surface_condition ?? "unknown").replaceAll("_", " ")}</p>
+                    <p>Vehicle: {report.recommended_vehicle ?? "Not specified"}</p>
+                    <p>Mud / Snow / Rut: {[report.mud_severity, report.snow_severity, report.rut_severity].map((value) => (value ?? "unknown").replaceAll("_", " ")).join(" / ")}</p>
+                    <p>
+                      Flags: {[
+                        report.washout ? "washout" : null,
+                        report.fallen_tree ? "fallen tree" : null,
+                        report.standing_water ? "standing water" : null,
+                        report.erosion ? "erosion" : null
+                      ].filter(Boolean).join(", ") || "none"}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-700">{report.description ?? "No report notes provided."}</p>
+                  {(report.latitude != null && report.longitude != null) || report.photo_id ? (
+                    <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-500">
+                      {report.latitude != null && report.longitude != null ? `GPS ${report.latitude.toFixed(4)}, ${report.longitude.toFixed(4)}` : "GPS not recorded"}
+                      {report.photo_id ? ` | Linked photo ${report.photo_id}` : ""}
+                    </p>
+                  ) : null}
+                </article>
+              ))
+            )}
           </div>
         </div>
       </section>
