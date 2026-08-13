@@ -1,6 +1,3 @@
-alter table road_closures_alerts
-  add column if not exists external_alert_id text;
-
 drop index if exists road_closures_alerts_source_external_idx;
 
 create unique index if not exists road_closures_alerts_source_external_idx
