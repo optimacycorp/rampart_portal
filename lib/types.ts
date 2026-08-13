@@ -302,6 +302,60 @@ export type LidarScan = {
   updated_at?: string | null;
 };
 
+export type LprCamera = {
+  id: string;
+  project_id: string;
+  name: string;
+  manufacturer?: string | null;
+  model?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  elevation_ft?: number | null;
+  install_location?: string | null;
+  direction_facing?: string | null;
+  connectivity?: string | null;
+  power_source?: string | null;
+  solar_panel_watts?: number | null;
+  battery_wh?: number | null;
+  camera_ip?: string | null;
+  integration_type?: string | null;
+  active?: boolean | null;
+  last_seen_at?: string | null;
+  created_at?: string | null;
+};
+
+export type LprEvent = {
+  id: string;
+  camera_id: string;
+  observed_at: string;
+  plate_text?: string | null;
+  plate_confidence?: number | null;
+  plate_state?: string | null;
+  vehicle_type?: string | null;
+  vehicle_make?: string | null;
+  vehicle_model?: string | null;
+  vehicle_color?: string | null;
+  direction?: string | null;
+  image_path?: string | null;
+  plate_crop_path?: string | null;
+  event_latitude?: number | null;
+  event_longitude?: number | null;
+  raw_payload?: Record<string, unknown> | null;
+  created_at?: string | null;
+};
+
+export type LprDailyStat = {
+  id: string;
+  camera_id: string;
+  stat_date: string;
+  total_vehicles?: number | null;
+  unique_plates?: number | null;
+  inbound_count?: number | null;
+  outbound_count?: number | null;
+  first_vehicle_at?: string | null;
+  last_vehicle_at?: string | null;
+};
+
 export type RoadAuthorityLevel =
   | "authoritative"
   | "authoritative_weather"

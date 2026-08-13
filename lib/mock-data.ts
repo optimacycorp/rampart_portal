@@ -3,6 +3,9 @@ import {
   DocumentChunk,
   EvidencePhoto,
   FieldPoint,
+  LprCamera,
+  LprDailyStat,
+  LprEvent,
   MeetingTranscript,
   RoadClosureAlert,
   RoadConditionReport,
@@ -613,5 +616,122 @@ export const seededRoadFieldMeasurements: RoadFieldMeasurement[] = [
     source_equipment: "3DMakerPro Eagle Max",
     notes: "Short uphill segment grade captured from corridor scan preview alignment.",
     created_at: new Date("2026-08-10T10:41:00-06:00").toISOString()
+  }
+];
+
+export const seededLprCameras: LprCamera[] = [
+  {
+    id: "lpr-camera-1",
+    project_id: seededProject.id,
+    name: "North Gate Solar LPR",
+    manufacturer: "Milesight",
+    model: "Solar ANPR",
+    latitude: 38.9218,
+    longitude: -104.6179,
+    elevation_ft: 6970,
+    install_location: "Primary ingress near 3245 Rampart Range Rd",
+    direction_facing: "northbound ingress / southbound egress",
+    connectivity: "wifi",
+    power_source: "solar",
+    solar_panel_watts: 200,
+    battery_wh: 962,
+    integration_type: "http_notification",
+    active: true,
+    last_seen_at: "2026-08-13T14:05:00-06:00",
+    created_at: "2026-08-12T09:00:00-06:00"
+  }
+];
+
+export const seededLprEvents: LprEvent[] = [
+  {
+    id: "lpr-event-1",
+    camera_id: "lpr-camera-1",
+    observed_at: "2026-08-13T07:14:00-06:00",
+    plate_text: "ABC1234",
+    plate_confidence: 0.94,
+    plate_state: "CO",
+    vehicle_type: "pickup",
+    vehicle_make: "Ford",
+    vehicle_model: "F-150",
+    vehicle_color: "white",
+    direction: "inbound",
+    image_path: null,
+    plate_crop_path: null,
+    event_latitude: 38.9218,
+    event_longitude: -104.6179,
+    raw_payload: {
+      source: "fallback",
+      recognized_at_edge: true
+    },
+    created_at: "2026-08-13T07:14:03-06:00"
+  },
+  {
+    id: "lpr-event-2",
+    camera_id: "lpr-camera-1",
+    observed_at: "2026-08-13T11:52:00-06:00",
+    plate_text: "XYZ9876",
+    plate_confidence: 0.89,
+    plate_state: "CO",
+    vehicle_type: "suv",
+    vehicle_make: "Toyota",
+    vehicle_model: "4Runner",
+    vehicle_color: "gray",
+    direction: "outbound",
+    image_path: null,
+    plate_crop_path: null,
+    event_latitude: 38.9218,
+    event_longitude: -104.6179,
+    raw_payload: {
+      source: "fallback",
+      recognized_at_edge: true
+    },
+    created_at: "2026-08-13T11:52:02-06:00"
+  },
+  {
+    id: "lpr-event-3",
+    camera_id: "lpr-camera-1",
+    observed_at: "2026-08-12T18:20:00-06:00",
+    plate_text: "TEST246",
+    plate_confidence: 0.91,
+    plate_state: "CO",
+    vehicle_type: "car",
+    vehicle_make: "Subaru",
+    vehicle_model: "Outback",
+    vehicle_color: "blue",
+    direction: "inbound",
+    image_path: null,
+    plate_crop_path: null,
+    event_latitude: 38.9218,
+    event_longitude: -104.6179,
+    raw_payload: {
+      source: "fallback",
+      recognized_at_edge: true
+    },
+    created_at: "2026-08-12T18:20:02-06:00"
+  }
+];
+
+export const seededLprDailyStats: LprDailyStat[] = [
+  {
+    id: "lpr-stat-1",
+    camera_id: "lpr-camera-1",
+    stat_date: "2026-08-13",
+    total_vehicles: 12,
+    unique_plates: 9,
+    inbound_count: 7,
+    outbound_count: 5,
+    first_vehicle_at: "2026-08-13T06:48:00-06:00",
+    last_vehicle_at: "2026-08-13T15:09:00-06:00"
+  },
+  {
+    id: "lpr-stat-2",
+    camera_id: "lpr-camera-1",
+    stat_date: "2026-08-12",
+    total_vehicles: 18,
+    unique_plates: 13,
+    inbound_count: 10,
+    outbound_count: 8,
+    first_vehicle_at: "2026-08-12T06:31:00-06:00",
+    last_vehicle_at: "2026-08-12T19:02:00-06:00"
   }
 ];
