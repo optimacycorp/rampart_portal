@@ -590,3 +590,26 @@ export type RoadStatusEvent = {
   supporting_observation_id?: string | null;
   description?: string | null;
 };
+
+export type RoadIngestionRun = {
+  id: string;
+  source_id?: string | null;
+  job_name?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  status?: string | null;
+  records_received?: number | null;
+  records_inserted?: number | null;
+  records_updated?: number | null;
+  http_status?: number | null;
+  error_message?: string | null;
+  parser_version?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type RoadSourceHealth = {
+  source: RoadDataSource;
+  latestRun: RoadIngestionRun | null;
+  freshness: "current" | "aging" | "stale" | "failed" | "never";
+  failureCount7d: number;
+};

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { getProjectBySlug } from "@/lib/documents";
+import { getRecentRoadDailySnapshots } from "@/lib/road-history";
 import { fetchNwsForPoint } from "@/lib/nws";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
 import { getRecentRoadStatusEvents, getRoadCurrentStatusByCorridorId } from "@/lib/road-reconciliation";
@@ -517,4 +518,114 @@ export async function recalculateRoadStatus(projectSlug: string) {
 
   revalidatePath(`/projects/${projectSlug}/road`);
   redirect(`/projects/${projectSlug}/road?status=recalculated`);
+}
+
+export async function generateRoadSnapshot(projectSlug: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/road?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireRoadRefreshRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/road?error=forbidden`);
+  }
+
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+
+  if (!overview) {
+    redirect(`/projects/${projectSlug}/road?error=project-not-found`);
+  }
+
+  const currentStatus = await getRoadCurrentStatusByCorridorId(overview.corridor.id);
+
+  if (!currentStatus) {
+    redirect(`/projects/${projectSlug}/road?error=snapshot-failed`);
+  }
+
+  const recentSnapshots = await getRecentRoadDailySnapshots(overview.corridor.id, 1);
+  const previousSnapshot = recentSnapshots[0] ?? null;
+  const snapshotDate = new Date().toISOString().slice(0, 10);
+
+  const minTemperature = overview.weatherSnapshots
+    .map((snapshot) => snapshot.latestObservation?.temperature_f)
+    .filter((value): value is number => value != null);
+  const maxWindGust = overview.weatherSnapshots
+    .map((snapshot) => snapshot.latestObservation?.wind_gust_mph ?? snapshot.latestObservation?.wind_speed_mph)
+    .filter((value): value is number => value != null);
+  const precipitationValues = overview.weatherSnapshots
+    .map((snapshot) => snapshot.latestObservation?.precipitation_24h_in ?? snapshot.latestObservation?.precipitation_1h_in)
+    .filter((value): value is number => value != null);
+  const snowfallValues = overview.weatherSnapshots
+    .map((snapshot) => snapshot.nextForecast?.snowfall_inches)
+    .filter((value): value is number => value != null);
+
+  const roadConditionScore =
+    currentStatus.consolidated_status === "closed" || currentStatus.consolidated_status === "seasonal_closure"
+      ? 20
+      : currentStatus.overall_access_risk === "severe"
+        ? 30
+        : currentStatus.overall_access_risk === "high"
+          ? 50
+          : currentStatus.overall_access_risk === "moderate"
+            ? 72
+            : 88;
+
+  const weatherRiskScore =
+    currentStatus.overall_access_risk === "severe"
+      ? 92
+      : currentStatus.overall_access_risk === "high"
+        ? 72
+        : currentStatus.overall_access_risk === "moderate"
+          ? 48
+          : currentStatus.overall_access_risk === "low"
+            ? 18
+            : 0;
+
+  const { error } = await supabase.from("road_daily_snapshots").upsert(
+    {
+      corridor_id: overview.corridor.id,
+      snapshot_date: snapshotDate,
+      consolidated_status: currentStatus.consolidated_status ?? "unknown",
+      gate_status: currentStatus.gate_status ?? "unknown",
+      status_confidence: previousSnapshot?.status_confidence ?? 0.8,
+      status_source: currentStatus.consolidated_status_source ?? "Portal deterministic reconciliation",
+      min_temperature_f: minTemperature.length > 0 ? Math.min(...minTemperature) : null,
+      max_temperature_f: minTemperature.length > 0 ? Math.max(...minTemperature) : null,
+      precipitation_24h_in: precipitationValues.length > 0 ? Math.max(...precipitationValues) : null,
+      snowfall_24h_in: snowfallValues.length > 0 ? Math.max(...snowfallValues) : null,
+      max_wind_gust_mph: maxWindGust.length > 0 ? Math.max(...maxWindGust) : null,
+      active_weather_alerts: currentStatus.active_weather_alert_count ?? 0,
+      active_usfs_alerts: currentStatus.active_usfs_alert_count ?? 0,
+      road_condition_score: roadConditionScore,
+      weather_risk_score: weatherRiskScore,
+      overall_access_risk: currentStatus.overall_access_risk ?? "unknown",
+      summary:
+        currentStatus.consolidated_status_reason ??
+        "Generated from current road intelligence status, weather, and alert evidence.",
+      generated_at: new Date().toISOString(),
+      source_snapshot: {
+        consolidated_status: currentStatus.consolidated_status,
+        consolidated_status_source: currentStatus.consolidated_status_source,
+        official_status: currentStatus.official_status,
+        partner_status: currentStatus.partner_status,
+        weather_description: currentStatus.weather_description,
+        active_weather_alert_count: currentStatus.active_weather_alert_count,
+        active_usfs_alert_count: currentStatus.active_usfs_alert_count
+      }
+    },
+    {
+      onConflict: "corridor_id,snapshot_date",
+      ignoreDuplicates: false
+    }
+  );
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/road?error=snapshot-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/road`);
+  redirect(`/projects/${projectSlug}/road?status=snapshot-generated`);
 }

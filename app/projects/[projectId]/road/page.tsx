@@ -1,9 +1,10 @@
-import { recalculateRoadStatus, refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
+import { generateRoadSnapshot, recalculateRoadStatus, refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
+import { getRecentRoadDailySnapshots, getRoadSourceHealth } from "@/lib/road-history";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
 import { getRecentRoadStatusEvents } from "@/lib/road-reconciliation";
 import { GateStatus, OverallAccessRisk, RoadStatus } from "@/lib/types";
@@ -59,6 +60,21 @@ function freshnessTone(lastSuccessAt?: string | null) {
   return { label: "Stale", className: "bg-rose-100 text-rose-900" };
 }
 
+function healthTone(value: "current" | "aging" | "stale" | "failed" | "never") {
+  switch (value) {
+    case "current":
+      return "bg-emerald-100 text-emerald-900";
+    case "aging":
+      return "bg-amber-100 text-amber-900";
+    case "stale":
+      return "bg-orange-100 text-orange-900";
+    case "failed":
+      return "bg-rose-100 text-rose-900";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
 export default async function RoadPage({
   params,
   searchParams
@@ -98,15 +114,21 @@ export default async function RoadPage({
   }
 
   const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
-  const recentEvents = await getRecentRoadStatusEvents(corridor.id, 6);
+  const [recentEvents, recentSnapshots, sourceHealth] = await Promise.all([
+    getRecentRoadStatusEvents(corridor.id, 6),
+    getRecentRoadDailySnapshots(corridor.id, 10),
+    getRoadSourceHealth(corridor.id)
+  ]);
   const canRefresh = role === "owner" || role === "audit";
   const refreshAction = refreshRoadWeather.bind(null, projectId);
   const refreshStatusAction = refreshRoadStatusSources.bind(null, projectId);
   const recalcAction = recalculateRoadStatus.bind(null, projectId);
+  const snapshotAction = generateRoadSnapshot.bind(null, projectId);
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
     "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
     recalculated: "The deterministic reconciliation engine recalculated consolidated road status and logged a status event.",
+    "snapshot-generated": "A daily road snapshot was generated from the current reconciled status and weather evidence.",
     "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
     forbidden: "Only owner or audit users can refresh road intelligence sources.",
     "project-not-found": "The requested project or road corridor could not be found.",
@@ -115,7 +137,8 @@ export default async function RoadPage({
     "refresh-start-failed": "The portal could not create the NWS ingestion run record.",
     "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details.",
     "status-refresh-failed": "The USFS or RRMMC refresh failed. Check the road_ingestion_runs table for the error details.",
-    "recalculation-failed": "The portal could not log the reconciliation result. Check road_status_events and the current-status view."
+    "recalculation-failed": "The portal could not log the reconciliation result. Check road_status_events and the current-status view.",
+    "snapshot-failed": "The portal could not write the road snapshot. Check road_daily_snapshots and current road status data."
   };
 
   const cards = [
@@ -215,16 +238,24 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 4 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 5 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>Deterministic reconciliation now computes a consolidated road status with an explicit reason and source.</li>
-                <li>Manual recalc logs status events so the portal starts building a traceable change history.</li>
-                <li>USFS closure alerts override partner status, while weather warnings increase risk without silently becoming legal closures.</li>
-                <li>The road page now exposes the current evidence chain and recent reconciliation events.</li>
+                <li>Manual daily snapshot generation now writes historical road intelligence rows into `road_daily_snapshots`.</li>
+                <li>Source health now summarizes each provider’s latest run, failures, and freshness state.</li>
+                <li>The Road page now shows snapshot history and ingestion health alongside live intelligence.</li>
+                <li>This sets up the historical dashboard and source admin tools for the next phase.</li>
               </ul>
             </div>
             {canRefresh ? (
               <div className="flex flex-wrap gap-2">
+                <form action={snapshotAction}>
+                  <button
+                    type="submit"
+                    className="rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-clay/90"
+                  >
+                    Generate snapshot
+                  </button>
+                </form>
                 <form action={recalcAction}>
                   <button
                     type="submit"
@@ -270,31 +301,41 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Source registry</h2>
-              <p className="mt-2 text-sm text-slate-600">Each provider keeps its own authority tier and freshness state. Later sprints will add ingestion runs, health metrics, and admin refresh controls.</p>
+              <h2 className="text-xl font-semibold text-ink">Source health</h2>
+              <p className="mt-2 text-sm text-slate-600">Each provider keeps its own authority tier, latest ingestion result, and freshness state so stale or failed sources are visible immediately.</p>
             </div>
-            <span className="text-sm text-slate-500">{sources.length} sources</span>
+            <span className="text-sm text-slate-500">{sourceHealth.length} sources</span>
           </div>
           <div className="mt-5 space-y-4">
-            {sources.map((source) => {
-              const freshness = freshnessTone(source.last_success_at);
+            {sourceHealth.map((entry) => {
+              const freshness = entry.latestRun?.status === "failed"
+                ? { label: "Failed", className: healthTone("failed") }
+                : {
+                    label: entry.freshness[0].toUpperCase() + entry.freshness.slice(1),
+                    className: healthTone(entry.freshness)
+                  };
               return (
-                <article key={source.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <article key={entry.source.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-800">{source.provider_name}</p>
+                      <p className="font-semibold text-slate-800">{entry.source.provider_name}</p>
                       <p className="mt-1 text-sm text-slate-600">
-                        {source.provider_key} | {source.authority_level.replaceAll("_", " ")}
+                        {entry.source.provider_key} | {entry.source.authority_level.replaceAll("_", " ")}
                       </p>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${freshness.className}`}>{freshness.label}</span>
                   </div>
                   <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-                    <p>Cadence: {source.default_refresh_minutes ? `${source.default_refresh_minutes} min` : "Pending"}</p>
-                    <p>Method: {source.ingestion_method ?? "Pending"}</p>
-                    <p>Last success: {formatDateTime(source.last_success_at)}</p>
-                    <p>Parser version: {source.parser_version ?? "Pending"}</p>
+                    <p>Cadence: {entry.source.default_refresh_minutes ? `${entry.source.default_refresh_minutes} min` : "Pending"}</p>
+                    <p>Method: {entry.source.ingestion_method ?? "Pending"}</p>
+                    <p>Last success: {formatDateTime(entry.source.last_success_at)}</p>
+                    <p>Latest run: {entry.latestRun?.status ?? "Never run"}</p>
+                    <p>Parser version: {entry.latestRun?.parser_version ?? entry.source.parser_version ?? "Pending"}</p>
+                    <p>7d failures: {entry.failureCount7d}</p>
                   </div>
+                  {entry.latestRun?.error_message ? (
+                    <p className="mt-3 text-sm text-rose-700">{entry.latestRun.error_message}</p>
+                  ) : null}
                 </article>
               );
             })}
@@ -399,6 +440,38 @@ export default async function RoadPage({
                     </p>
                     <p className="mt-2 text-slate-600">{event.description ?? "No event description recorded."}</p>
                     <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatDateTime(event.detected_at)}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <h2 className="text-xl font-semibold text-ink">Snapshot history</h2>
+            <p className="mt-2 text-sm text-slate-600">Daily snapshots preserve the reconciled status and risk picture so later charts and seasonal summaries have stable historical rows to query.</p>
+            <div className="mt-5 space-y-3">
+              {recentSnapshots.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  No snapshots have been generated yet. Use <strong>Generate snapshot</strong> after a refresh and recalculation cycle.
+                </div>
+              ) : (
+                recentSnapshots.map((snapshot) => (
+                  <div key={snapshot.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-800">{snapshot.snapshot_date}</p>
+                        <p className="mt-1">
+                          Status: {labelStatus(snapshot.consolidated_status ?? "unknown")} | Risk: {labelRisk(snapshot.overall_access_risk ?? "unknown")}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                        Score {snapshot.road_condition_score ?? "n/a"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-slate-600">{snapshot.summary ?? "No summary stored."}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Weather alerts {snapshot.active_weather_alerts ?? 0} | USFS alerts {snapshot.active_usfs_alerts ?? 0} | Generated {formatDateTime(snapshot.generated_at)}
+                    </p>
                   </div>
                 ))
               )}
