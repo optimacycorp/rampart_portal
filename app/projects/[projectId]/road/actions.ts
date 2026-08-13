@@ -10,6 +10,7 @@ import { getRoadOverviewByProjectSlug } from "@/lib/road";
 import { getRecentRoadStatusEvents, getRoadCurrentStatusByCorridorId } from "@/lib/road-reconciliation";
 import { getEvidencePhotoById } from "@/lib/evidence-photos";
 import { getFieldPointById } from "@/lib/field-points";
+import { getLidarScanById } from "@/lib/lidar";
 import { fetchRrmmcRoadStatus, mapRrmmcRoadStatus } from "@/lib/rrmmc";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { fetchUsfsRoadStatus } from "@/lib/usfs";
@@ -719,4 +720,71 @@ export async function createRoadConditionReport(projectSlug: string, formData: F
 
   revalidatePath(`/projects/${projectSlug}/road`);
   redirect(`/projects/${projectSlug}/road?status=report-saved`);
+}
+
+export async function createRoadFieldMeasurement(projectSlug: string, formData: FormData) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/road?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireRoadRefreshRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/road?error=forbidden`);
+  }
+
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+
+  if (!overview) {
+    redirect(`/projects/${projectSlug}/road?error=project-not-found`);
+  }
+
+  const measurementType = readFormString(formData, "measurement_type");
+  const measuredAt = readFormString(formData, "measured_at");
+  const value = readFormNumber(formData, "value");
+  const units = readFormString(formData, "units");
+  const sourcePointId = readFormString(formData, "source_point_id");
+  const lidarScanId = readFormString(formData, "lidar_scan_id");
+
+  if (!measurementType || !measuredAt || value == null || !units) {
+    redirect(`/projects/${projectSlug}/road?error=measurement-missing-required-fields`);
+  }
+
+  if (sourcePointId) {
+    const point = await getFieldPointById(sourcePointId);
+    if (!point) {
+      redirect(`/projects/${projectSlug}/road?error=measurement-point-not-found`);
+    }
+  }
+
+  if (lidarScanId) {
+    const scan = await getLidarScanById(lidarScanId);
+    if (!scan) {
+      redirect(`/projects/${projectSlug}/road?error=measurement-lidar-not-found`);
+    }
+  }
+
+  const { error } = await supabase.from("road_field_measurements").insert({
+    corridor_id: overview.corridor.id,
+    measurement_type: measurementType,
+    measured_at: measuredAt,
+    value,
+    units,
+    latitude: readFormNumber(formData, "latitude"),
+    longitude: readFormNumber(formData, "longitude"),
+    elevation_ft: readFormNumber(formData, "elevation_ft"),
+    source_equipment: readFormString(formData, "source_equipment"),
+    source_point_id: sourcePointId,
+    lidar_scan_id: lidarScanId,
+    notes: readFormString(formData, "notes")
+  });
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/road?error=measurement-save-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/road`);
+  redirect(`/projects/${projectSlug}/road?status=measurement-saved`);
 }

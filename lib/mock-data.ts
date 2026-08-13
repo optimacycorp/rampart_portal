@@ -10,6 +10,7 @@ import {
   RoadCurrentStatus,
   RoadDataSource,
   RoadDailySnapshot,
+  RoadFieldMeasurement,
   RoadWeatherLocationSnapshot,
   RoadWeatherLocation,
   WeatherForecast,
@@ -565,5 +566,52 @@ export const seededRoadConditionReports: RoadConditionReport[] = [
     longitude: -104.6202,
     verified: false,
     created_at: new Date("2026-08-10T10:40:00-06:00").toISOString()
+  }
+];
+
+export const seededRoadFieldMeasurements: RoadFieldMeasurement[] = [
+  {
+    id: "road-measurement-1",
+    corridor_id: seededRoadCorridor.id,
+    measurement_type: "road_width",
+    measured_at: new Date("2026-08-12T15:20:00-06:00").toISOString(),
+    value: 18.4,
+    units: "ft",
+    latitude: 38.9223,
+    longitude: -104.6184,
+    elevation_ft: 6942.1,
+    source_equipment: "3DMakerPro Eagle Max",
+    source_point_id: "fp-3",
+    notes: "LiDAR-derived roadway width near the culvert crossing pinch point.",
+    created_at: new Date("2026-08-12T16:12:00-06:00").toISOString()
+  },
+  {
+    id: "road-measurement-2",
+    corridor_id: seededRoadCorridor.id,
+    measurement_type: "rut_depth",
+    measured_at: new Date("2026-08-12T15:32:00-06:00").toISOString(),
+    value: 0.42,
+    units: "ft",
+    latitude: 38.9223,
+    longitude: -104.6184,
+    elevation_ft: 6941.8,
+    source_equipment: "Field observation + LiDAR check",
+    source_point_id: "fp-3",
+    notes: "Observed rut depth beside the drainage crossing after runoff.",
+    created_at: new Date("2026-08-12T16:15:00-06:00").toISOString()
+  },
+  {
+    id: "road-measurement-3",
+    corridor_id: seededRoadCorridor.id,
+    measurement_type: "grade_percent",
+    measured_at: new Date("2026-08-10T10:00:00-06:00").toISOString(),
+    value: 8.6,
+    units: "%",
+    latitude: 38.9241,
+    longitude: -104.6202,
+    elevation_ft: 6954.2,
+    source_equipment: "3DMakerPro Eagle Max",
+    notes: "Short uphill segment grade captured from corridor scan preview alignment.",
+    created_at: new Date("2026-08-10T10:41:00-06:00").toISOString()
   }
 ];

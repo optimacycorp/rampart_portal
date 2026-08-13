@@ -613,30 +613,3 @@ export type RoadSourceHealth = {
   freshness: "current" | "aging" | "stale" | "failed" | "never";
   failureCount7d: number;
 };
-
-export type RoadConditionReport = {
-  id: string;
-  corridor_id?: string | null;
-  segment_id?: string | null;
-  report_source?: string | null;
-  reported_by?: string | null;
-  observed_at: string;
-  condition?: string | null;
-  surface_condition?: string | null;
-  mud_severity?: string | null;
-  snow_severity?: string | null;
-  rut_severity?: string | null;
-  washout?: boolean | null;
-  fallen_tree?: boolean | null;
-  standing_water?: boolean | null;
-  erosion?: boolean | null;
-  passability?: string | null;
-  recommended_vehicle?: string | null;
-  description?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  photo_id?: string | null;
-  source_url?: string | null;
-  verified?: boolean | null;
-  created_at?: string | null;
-};

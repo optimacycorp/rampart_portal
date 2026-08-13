@@ -113,3 +113,18 @@ export const ROAD_SURFACE_CONDITION_OPTIONS = [
 ] as const;
 
 export const ROAD_SEVERITY_OPTIONS = ["none", "low", "moderate", "high", "severe", "unknown"] as const;
+
+export const ROAD_MEASUREMENT_TYPE_OPTIONS = [
+  "road_width",
+  "travelway_width",
+  "shoulder_width",
+  "grade_percent",
+  "cross_slope_percent",
+  "rut_depth",
+  "washout_depth",
+  "ditch_depth",
+  "culvert_diameter",
+  "culvert_cover_depth",
+  "clearance_height",
+  "other"
+] as const;

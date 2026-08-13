@@ -1,22 +1,38 @@
-import { generateRoadSnapshot, recalculateRoadStatus, refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
-import { createRoadConditionReport } from "@/app/projects/[projectId]/road/actions";
-import { getCurrentUserContext } from "@/lib/auth-server";
-import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
+import Link from "next/link";
+import {
+  createRoadConditionReport,
+  createRoadFieldMeasurement,
+  generateRoadSnapshot,
+  recalculateRoadStatus,
+  refreshRoadStatusSources,
+  refreshRoadWeather
+} from "@/app/projects/[projectId]/road/actions";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
+import { RoadFieldMeasurementForm } from "@/components/RoadFieldMeasurementForm";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
+import { getCulvertsByProjectId } from "@/lib/culverts";
 import { getProjectBySlug } from "@/lib/documents";
-import { getRecentRoadDailySnapshots, getRoadSourceHealth } from "@/lib/road-history";
+import { getEvidencePhotosByProjectSlug } from "@/lib/evidence-photos";
+import { getFieldPointsByProjectSlug } from "@/lib/field-points";
+import { getLidarScansByProjectSlug } from "@/lib/lidar";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
+import { getRecentRoadDailySnapshots, getRoadSourceHealth } from "@/lib/road-history";
+import { getRoadFieldMeasurementsByCorridorId, getRoadMeasurementStats } from "@/lib/road-measurements";
 import { getRecentRoadStatusEvents } from "@/lib/road-reconciliation";
 import { getRoadConditionReportsByCorridorId } from "@/lib/road-reports";
 import { GateStatus, OverallAccessRisk, RoadStatus } from "@/lib/types";
-import { getEvidencePhotosByProjectSlug } from "@/lib/evidence-photos";
-import { getFieldPointsByProjectSlug } from "@/lib/field-points";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "Not reported";
   return new Date(value).toLocaleString();
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "No date";
+  return new Date(value).toLocaleDateString();
 }
 
 function labelStatus(value?: RoadStatus | null) {
@@ -32,6 +48,18 @@ function labelGateStatus(value?: GateStatus | null) {
   return value.replaceAll("_", " ");
 }
 
+function formatMeasurementType(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function formatMeasurementValue(value?: number | null, units?: string | null) {
+  if (value == null) {
+    return "Value not recorded";
+  }
+
+  return `${value} ${units ?? ""}`.trim();
+}
+
 function statusTone(value?: RoadStatus | null) {
   switch (value) {
     case "open":
@@ -45,24 +73,6 @@ function statusTone(value?: RoadStatus | null) {
     default:
       return "border-slate-200 bg-slate-50 text-slate-800";
   }
-}
-
-function freshnessTone(lastSuccessAt?: string | null) {
-  if (!lastSuccessAt) {
-    return { label: "Not run", className: "bg-slate-100 text-slate-700" };
-  }
-
-  const ageHours = (Date.now() - new Date(lastSuccessAt).getTime()) / 36e5;
-
-  if (ageHours <= 2) {
-    return { label: "Current", className: "bg-emerald-100 text-emerald-900" };
-  }
-
-  if (ageHours <= 12) {
-    return { label: "Aging", className: "bg-amber-100 text-amber-900" };
-  }
-
-  return { label: "Stale", className: "bg-rose-100 text-rose-900" };
 }
 
 function healthTone(value: "current" | "aging" | "stale" | "failed" | "never") {
@@ -118,27 +128,39 @@ export default async function RoadPage({
     );
   }
 
-  const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
-  const [recentEvents, recentSnapshots, sourceHealth, roadReports, fieldPoints, photos] = await Promise.all([
+  const { corridor, currentStatus, activeAlerts, latestSnapshot } = overview;
+  const [recentEvents, recentSnapshots, sourceHealth, roadReports, fieldPoints, photos, lidarScans, culverts, roadMeasurements, measurementStats] = await Promise.all([
     getRecentRoadStatusEvents(corridor.id, 6),
     getRecentRoadDailySnapshots(corridor.id, 10),
     getRoadSourceHealth(corridor.id),
     getRoadConditionReportsByCorridorId(corridor.id, 12),
     getFieldPointsByProjectSlug(projectId),
-    getEvidencePhotosByProjectSlug(projectId)
+    getEvidencePhotosByProjectSlug(projectId),
+    getLidarScansByProjectSlug(projectId),
+    getCulvertsByProjectId(project.id),
+    getRoadFieldMeasurementsByCorridorId(corridor.id, 12),
+    getRoadMeasurementStats(corridor.id)
   ]);
+
   const canRefresh = role === "owner" || role === "audit";
   const refreshAction = refreshRoadWeather.bind(null, projectId);
   const refreshStatusAction = refreshRoadStatusSources.bind(null, projectId);
   const recalcAction = recalculateRoadStatus.bind(null, projectId);
   const snapshotAction = generateRoadSnapshot.bind(null, projectId);
   const reportAction = createRoadConditionReport.bind(null, projectId);
+  const measurementAction = createRoadFieldMeasurement.bind(null, projectId);
+  const roadPointTypes = new Set(["road_edge", "gate", "turnout", "driveway", "culvert_inlet", "culvert_outlet", "ditch", "swale", "berm", "photo_station"]);
+  const roadFieldPoints = fieldPoints.filter((point) => roadPointTypes.has(point.point_type));
+  const fieldPointMap = new Map(fieldPoints.map((point) => [point.id, point]));
+  const lidarScanMap = new Map(lidarScans.map((scan) => [scan.id, scan]));
+
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
     "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
     recalculated: "The deterministic reconciliation engine recalculated consolidated road status and logged a status event.",
     "snapshot-generated": "A daily road snapshot was generated from the current reconciled status and weather evidence.",
     "report-saved": "Road condition report saved. It is marked as a user observation until explicitly verified.",
+    "measurement-saved": "Roadway measurement saved and linked into the corridor evidence workspace.",
     "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
     forbidden: "Only owner or audit users can refresh road intelligence sources.",
     "project-not-found": "The requested project or road corridor could not be found.",
@@ -151,6 +173,10 @@ export default async function RoadPage({
     "snapshot-failed": "The portal could not write the road snapshot. Check road_daily_snapshots and current road status data.",
     "report-missing-required-fields": "Observed date/time, condition summary, and report notes are required.",
     "report-save-failed": "The road condition report could not be saved.",
+    "measurement-missing-required-fields": "Measurement date/time, type, numeric value, and units are required.",
+    "measurement-save-failed": "The roadway measurement could not be saved.",
+    "measurement-point-not-found": "The selected linked field point could not be found.",
+    "measurement-lidar-not-found": "The selected LiDAR scan could not be found.",
     "photo-not-found": "The selected linked photo could not be found.",
     "point-not-found": "The selected linked field point could not be found."
   };
@@ -212,7 +238,7 @@ export default async function RoadPage({
       <PageHeader
         eyebrow="Road Intelligence"
         title={`${project.name} road intelligence`}
-        description="Track FS 0300 status, weather risk, alerts, source freshness, and future roadway analytics in one evidence-driven workspace."
+        description="Track FS 0300 status, weather risk, alerts, source freshness, LiDAR-linked roadway measurements, and field evidence in one workspace."
       />
       <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
         <strong>Road intelligence notice:</strong> {ROAD_INTELLIGENCE_DISCLAIMER}
@@ -244,20 +270,19 @@ export default async function RoadPage({
             </span>
           </div>
           <p className="mt-5 max-w-3xl text-sm leading-6">
-            {currentStatus.latest_condition_report ??
-              "No condition report summary has been stored yet. This sprint lays the schema and workspace foundations so automated sources and field reports can land in the next sprint."}
+            {currentStatus.latest_condition_report ?? "No condition report summary has been stored yet. Refresh sources and add field reports to strengthen the current corridor picture."}
           </p>
         </div>
 
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 6 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 7 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>Authorized users can now log field road-condition reports with passability, severity, GPS, and evidence links.</li>
-                <li>Road reports are stored separately as user observations, not authoritative closures or safety determinations.</li>
-                <li>The Road page now shows a recent field-report feed alongside live intelligence and historical snapshots.</li>
-                <li>This gives the portal its first true field-evidence workflow for road conditions.</li>
+                <li>LiDAR scans, road-specific field points, culverts, and roadway measurements now surface together in the Road workspace.</li>
+                <li>Authorized users can save road width, grade, rut-depth, culvert, and other corridor measurements with optional LiDAR and field-point links.</li>
+                <li>The page now highlights which LiDAR scans and field evidence support road coordination rather than leaving those datasets isolated.</li>
+                <li>This creates the first corridor-geometry evidence layer for future profiles, exports, and engineer review packages.</li>
               </ul>
             </div>
             {canRefresh ? (
@@ -296,6 +321,102 @@ export default async function RoadPage({
                 </form>
               </div>
             ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+          <h2 className="text-xl font-semibold text-ink">Log roadway measurement</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Save LiDAR-derived or field-checked corridor measurements such as road width, grade, rut depth, ditch depth, or culvert dimensions. Link them to scans and field points so later review can trace the evidence.
+          </p>
+          <div className="mt-5">
+            {canRefresh ? (
+              <RoadFieldMeasurementForm action={measurementAction} fieldPoints={roadFieldPoints} lidarScans={lidarScans} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                Only owner or audit users can save roadway measurements.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-ink">LiDAR road analytics</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Corridor-linked scan coverage, field evidence, and saved measurements available for road review.
+                </p>
+              </div>
+              <Link href={`/projects/${projectId}/lidar`} className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white">
+                Open LiDAR library
+              </Link>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pine">Linked scans</p>
+                <p className="mt-2 text-3xl font-semibold text-ink">{lidarScans.length}</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {lidarScans.reduce((sum, scan) => sum + (scan.area_acres ?? 0), 0).toFixed(2)} acres of registered scan coverage.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pine">Road evidence points</p>
+                <p className="mt-2 text-3xl font-semibold text-ink">{roadFieldPoints.length}</p>
+                <p className="mt-2 text-sm text-slate-600">{culverts.length} culverts and {photos.length} photos/videos available to support corridor review.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pine">Saved measurements</p>
+                <p className="mt-2 text-3xl font-semibold text-ink">{measurementStats.totalMeasurements}</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {measurementStats.lidarLinkedMeasurements} LiDAR-linked and {measurementStats.linkedPointMeasurements} tied to field points.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pine">Latest measurement</p>
+                <p className="mt-2 text-lg font-semibold text-ink">{formatDateTime(measurementStats.recentMeasurementAt)}</p>
+                <p className="mt-2 text-sm text-slate-600">Use saved measurements to support future cross-sections, export packages, and road review summaries.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-ink">Registered scan support</h2>
+                <p className="mt-2 text-sm text-slate-600">Open a scan when you need point-cloud context for a roadway issue, culvert crossing, or access pinch point.</p>
+              </div>
+              <span className="text-sm text-slate-500">{lidarScans.length} scans</span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {lidarScans.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  No LiDAR scans are registered yet for this project.
+                </div>
+              ) : (
+                lidarScans.slice(0, 4).map((scan) => (
+                  <div key={scan.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-800">{scan.title}</p>
+                        <p className="mt-1 text-slate-600">
+                          {formatDate(scan.scan_date)} | {scan.equipment ?? "Equipment pending"}
+                        </p>
+                      </div>
+                      <Link href={`/projects/${projectId}/lidar/${scan.id}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-300">
+                        Open scan
+                      </Link>
+                    </div>
+                    <p className="mt-3 text-slate-600">
+                      {(scan.processing_stage ?? "raw_uploaded").replaceAll("_", " ")} | {scan.point_count?.toLocaleString() ?? "Unknown"} points | {scan.area_acres ?? "Unknown"} acres
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -365,6 +486,89 @@ export default async function RoadPage({
                     </p>
                   ) : null}
                 </article>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Recent roadway measurements</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Saved roadway measurements can be traced back to linked LiDAR scans, field points, and corridor locations.
+              </p>
+            </div>
+            <span className="text-sm text-slate-500">{roadMeasurements.length} measurements</span>
+          </div>
+          <div className="mt-5 space-y-4">
+            {roadMeasurements.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                No roadway measurements have been saved yet.
+              </div>
+            ) : (
+              roadMeasurements.map((measurement) => {
+                const linkedPoint = measurement.source_point_id ? fieldPointMap.get(measurement.source_point_id) : null;
+                const linkedScan = measurement.lidar_scan_id ? lidarScanMap.get(measurement.lidar_scan_id) : null;
+
+                return (
+                  <article key={measurement.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          {formatMeasurementType(measurement.measurement_type)} | {formatMeasurementValue(measurement.value, measurement.units)}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">{formatDateTime(measurement.measured_at ?? measurement.created_at)}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                        {measurement.source_equipment ?? "Source not recorded"}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                      <p>Linked point: {linkedPoint ? `${linkedPoint.point_name} (${linkedPoint.point_type})` : "None"}</p>
+                      <p>Linked scan: {linkedScan ? linkedScan.title : "None"}</p>
+                      <p>Latitude / Longitude: {measurement.latitude != null && measurement.longitude != null ? `${measurement.latitude}, ${measurement.longitude}` : "Not recorded"}</p>
+                      <p>Elevation: {measurement.elevation_ft != null ? `${measurement.elevation_ft} ft` : "Not recorded"}</p>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-700">{measurement.notes ?? "No measurement notes provided."}</p>
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-ink">Road-linked field points</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                These point types are most likely to matter for corridor access, drainage, and road geometry review.
+              </p>
+            </div>
+            <span className="text-sm text-slate-500">{roadFieldPoints.length} points</span>
+          </div>
+          <div className="mt-5 space-y-3">
+            {roadFieldPoints.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                No road-linked field points were found yet.
+              </div>
+            ) : (
+              roadFieldPoints.slice(0, 10).map((point) => (
+                <div key={point.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <p className="font-semibold text-slate-800">{point.point_name}</p>
+                  <p className="mt-1 text-slate-600">{point.point_type.replaceAll("_", " ")}</p>
+                  <p className="mt-2 text-slate-600">
+                    {point.latitude != null && point.longitude != null
+                      ? `${point.latitude}, ${point.longitude}`
+                      : point.easting != null && point.northing != null
+                        ? `${point.easting}, ${point.northing}`
+                        : "Coordinates pending"}
+                  </p>
+                  <p className="mt-2 text-slate-600">{point.description ?? "No point description recorded."}</p>
+                </div>
               ))
             )}
           </div>
@@ -521,7 +725,7 @@ export default async function RoadPage({
                   <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                     <p className="font-semibold text-slate-800">{event.event_type.replaceAll("_", " ")}</p>
                     <p className="mt-1">
-                      {event.old_value ?? "unknown"} → {event.new_value ?? "unknown"}
+                      {event.old_value ?? "unknown"} -&gt; {event.new_value ?? "unknown"}
                     </p>
                     <p className="mt-2 text-slate-600">{event.description ?? "No event description recorded."}</p>
                     <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatDateTime(event.detected_at)}</p>
