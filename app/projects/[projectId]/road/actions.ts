@@ -6,7 +6,9 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { getProjectBySlug } from "@/lib/documents";
 import { fetchNwsForPoint } from "@/lib/nws";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
+import { fetchRrmmcRoadStatus, mapRrmmcRoadStatus } from "@/lib/rrmmc";
 import { getSupabaseAdminClient } from "@/lib/supabase";
+import { fetchUsfsRoadStatus } from "@/lib/usfs";
 
 async function requireRoadRefreshRole() {
   const { user, role } = await getCurrentUserContext();
@@ -244,4 +246,217 @@ export async function refreshRoadWeather(projectSlug: string) {
 
   revalidatePath(`/projects/${projectSlug}/road`);
   redirect(`/projects/${projectSlug}/road?status=weather-refreshed`);
+}
+
+export async function refreshRoadStatusSources(projectSlug: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/road?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireRoadRefreshRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/road?error=forbidden`);
+  }
+
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+  const project = await getProjectBySlug(projectSlug);
+
+  if (!project || !overview) {
+    redirect(`/projects/${projectSlug}/road?error=project-not-found`);
+  }
+
+  const rrmmcSource = overview.sources.find((source) => source.provider_key === "rrmmc");
+  const usfsSource = overview.sources.find((source) => source.provider_key === "usfs_psicc");
+
+  if (!rrmmcSource || !usfsSource) {
+    redirect(`/projects/${projectSlug}/road?error=status-source-not-found`);
+  }
+
+  const { data: rrmmcRun } = await supabase
+    .from("road_ingestion_runs")
+    .insert({
+      source_id: rrmmcSource.id,
+      job_name: "manual-rrmmc-refresh",
+      started_at: new Date().toISOString(),
+      status: "running",
+      parser_version: "rrmmc-manual-v1",
+      metadata: { corridor_id: overview.corridor.id }
+    })
+    .select("id")
+    .single();
+
+  const { data: usfsRun } = await supabase
+    .from("road_ingestion_runs")
+    .insert({
+      source_id: usfsSource.id,
+      job_name: "manual-usfs-refresh",
+      started_at: new Date().toISOString(),
+      status: "running",
+      parser_version: "usfs-manual-v1",
+      metadata: { corridor_id: overview.corridor.id }
+    })
+    .select("id")
+    .single();
+
+  if (!rrmmcRun || !usfsRun) {
+    redirect(`/projects/${projectSlug}/road?error=refresh-start-failed`);
+  }
+
+  try {
+    const [rrmmc, usfs] = await Promise.all([fetchRrmmcRoadStatus(), fetchUsfsRoadStatus()]);
+
+    const rrmmcInsert = await supabase.from("road_status_observations").insert({
+      corridor_id: overview.corridor.id,
+      source_id: rrmmcSource.id,
+      observed_at: new Date().toISOString(),
+      fetched_at: new Date().toISOString(),
+      status: mapRrmmcRoadStatus(rrmmc.roadStatus),
+      gate_status: "unknown",
+      summary: rrmmc.summary,
+      raw_status_text: rrmmc.rawStatusText,
+      source_url: rrmmc.sourceUrl,
+      confidence: 0.7,
+      official: false,
+      raw_payload: rrmmc.rawPayload
+    });
+
+    if (rrmmcInsert.error) {
+      throw rrmmcInsert.error;
+    }
+
+    await supabase
+      .from("road_data_sources")
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        parser_version: "rrmmc-manual-v1",
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", rrmmcSource.id);
+
+    await supabase
+      .from("road_ingestion_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "success",
+        records_received: 1,
+        records_inserted: 1,
+        records_updated: 0,
+        http_status: 200,
+        metadata: {
+          road_status: rrmmc.roadStatus,
+          trail_status: rrmmc.trailStatus
+        }
+      })
+      .eq("id", rrmmcRun.id);
+
+    await supabase
+      .from("road_closures_alerts")
+      .update({
+        active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq("corridor_id", overview.corridor.id)
+      .eq("source_id", usfsSource.id);
+
+    const usfsObservationInsert = await supabase.from("road_status_observations").insert({
+      corridor_id: overview.corridor.id,
+      source_id: usfsSource.id,
+      observed_at: new Date().toISOString(),
+      fetched_at: new Date().toISOString(),
+      status: usfs.authoritativeStatus,
+      gate_status: "unknown",
+      summary: usfs.summary,
+      raw_status_text: usfs.rawStatusText,
+      source_url: usfs.sourceUrl,
+      confidence: 0.85,
+      official: true,
+      raw_payload: usfs.rawPayload
+    });
+
+    if (usfsObservationInsert.error) {
+      throw usfsObservationInsert.error;
+    }
+
+    if (usfs.alerts.length > 0) {
+      const alertUpsert = await supabase.from("road_closures_alerts").upsert(
+        usfs.alerts.map((alert) => ({
+          corridor_id: overview.corridor.id,
+          source_id: usfsSource.id,
+          external_alert_id: alert.externalAlertId,
+          alert_type: alert.alertType,
+          severity: alert.severity,
+          title: alert.title,
+          description: alert.description,
+          effective_at: alert.effectiveAt,
+          expires_at: alert.expiresAt,
+          active: true,
+          source_url: alert.sourceUrl,
+          raw_payload: alert.rawPayload,
+          updated_at: new Date().toISOString()
+        })),
+        {
+          onConflict: "source_id,external_alert_id",
+          ignoreDuplicates: false
+        }
+      );
+
+      if (alertUpsert.error) {
+        throw alertUpsert.error;
+      }
+    }
+
+    await supabase
+      .from("road_data_sources")
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        parser_version: "usfs-manual-v1",
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", usfsSource.id);
+
+    await supabase
+      .from("road_ingestion_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "success",
+        records_received: 1 + usfs.alerts.length,
+        records_inserted: 1 + usfs.alerts.length,
+        records_updated: 0,
+        http_status: 200,
+        metadata: {
+          authoritative_status: usfs.authoritativeStatus,
+          alert_count: usfs.alerts.length
+        }
+      })
+      .eq("id", usfsRun.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected road status refresh failure.";
+
+    await supabase
+      .from("road_ingestion_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "failed",
+        error_message: message
+      })
+      .in("id", [rrmmcRun.id, usfsRun.id]);
+
+    await supabase
+      .from("road_data_sources")
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .in("id", [rrmmcSource.id, usfsSource.id]);
+
+    redirect(`/projects/${projectSlug}/road?error=status-refresh-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/road`);
+  redirect(`/projects/${projectSlug}/road?status=status-refreshed`);
 }

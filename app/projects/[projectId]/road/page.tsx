@@ -1,4 +1,4 @@
-import { refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
+import { refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
@@ -99,14 +99,18 @@ export default async function RoadPage({
   const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
   const canRefresh = role === "owner" || role === "audit";
   const refreshAction = refreshRoadWeather.bind(null, projectId);
+  const refreshStatusAction = refreshRoadStatusSources.bind(null, projectId);
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
+    "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
     "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
     forbidden: "Only owner or audit users can refresh road intelligence sources.",
     "project-not-found": "The requested project or road corridor could not be found.",
     "nws-source-not-found": "The NWS road-data source record is missing. Run the latest road migrations first.",
+    "status-source-not-found": "The USFS or RRMMC source record is missing. Run the latest road migrations first.",
     "refresh-start-failed": "The portal could not create the NWS ingestion run record.",
-    "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details."
+    "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details.",
+    "status-refresh-failed": "The USFS or RRMMC refresh failed. Check the road_ingestion_runs table for the error details."
   };
 
   const cards = [
@@ -200,23 +204,33 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 2 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 3 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>NWS point discovery, observations, forecasts, and active alerts wired into the portal.</li>
-                <li>Manual owner/audit refresh creates audited `road_ingestion_runs` records.</li>
-                <li>Per-location weather snapshots now render from stored Supabase records.</li>
-                <li>Active weather alerts remain distinct from legal road-status determinations.</li>
+                <li>USFS authority parsing and RRMMC partner-status parsing are wired into the portal.</li>
+                <li>Manual owner/audit refresh now supports both weather and status-source ingestion runs.</li>
+                <li>Official and partner observations flow into the current-status view without treating community data as legal closure authority.</li>
+                <li>Forest Service alerts stay separate from community or weather observations for traceable evidence review.</li>
               </ul>
             </div>
             {canRefresh ? (
-              <form action={refreshAction}>
-                <button
-                  type="submit"
-                  className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pine/90"
-                >
-                  Refresh NWS data
-                </button>
-              </form>
+              <div className="flex flex-wrap gap-2">
+                <form action={refreshStatusAction}>
+                  <button
+                    type="submit"
+                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                  >
+                    Refresh status sources
+                  </button>
+                </form>
+                <form action={refreshAction}>
+                  <button
+                    type="submit"
+                    className="rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-pine/90"
+                  >
+                    Refresh NWS data
+                  </button>
+                </form>
+              </div>
             ) : null}
           </div>
         </div>
