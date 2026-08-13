@@ -516,15 +516,3 @@ export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededR
   latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
   nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
 }));
-
-export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededRoadWeatherLocations.map((location) => ({
-  location,
-  latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
-  nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
-}));
-
-export const seededRoadWeatherSnapshots: RoadWeatherLocationSnapshot[] = seededRoadWeatherLocations.map((location) => ({
-  location,
-  latestObservation: seededWeatherObservations.find((observation) => observation.location_id === location.id) ?? null,
-  nextForecast: seededWeatherForecasts.find((forecast) => forecast.location_id === location.id) ?? null
-}));
