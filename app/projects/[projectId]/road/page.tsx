@@ -1,10 +1,11 @@
-import { refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
+import { recalculateRoadStatus, refreshRoadStatusSources, refreshRoadWeather } from "@/app/projects/[projectId]/road/actions";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
 import { getProjectBySlug } from "@/lib/documents";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
+import { getRecentRoadStatusEvents } from "@/lib/road-reconciliation";
 import { GateStatus, OverallAccessRisk, RoadStatus } from "@/lib/types";
 
 function formatDateTime(value?: string | null) {
@@ -97,12 +98,15 @@ export default async function RoadPage({
   }
 
   const { corridor, currentStatus, activeAlerts, latestSnapshot, sources } = overview;
+  const recentEvents = await getRecentRoadStatusEvents(corridor.id, 6);
   const canRefresh = role === "owner" || role === "audit";
   const refreshAction = refreshRoadWeather.bind(null, projectId);
   const refreshStatusAction = refreshRoadStatusSources.bind(null, projectId);
+  const recalcAction = recalculateRoadStatus.bind(null, projectId);
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
     "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
+    recalculated: "The deterministic reconciliation engine recalculated consolidated road status and logged a status event.",
     "supabase-not-configured": "Supabase is not configured yet. Add the project URL and service role key on the server.",
     forbidden: "Only owner or audit users can refresh road intelligence sources.",
     "project-not-found": "The requested project or road corridor could not be found.",
@@ -110,10 +114,17 @@ export default async function RoadPage({
     "status-source-not-found": "The USFS or RRMMC source record is missing. Run the latest road migrations first.",
     "refresh-start-failed": "The portal could not create the NWS ingestion run record.",
     "refresh-failed": "The NWS refresh failed. Check the road_ingestion_runs table for the error details.",
-    "status-refresh-failed": "The USFS or RRMMC refresh failed. Check the road_ingestion_runs table for the error details."
+    "status-refresh-failed": "The USFS or RRMMC refresh failed. Check the road_ingestion_runs table for the error details.",
+    "recalculation-failed": "The portal could not log the reconciliation result. Check road_status_events and the current-status view."
   };
 
   const cards = [
+    {
+      title: "Consolidated status",
+      value: labelStatus(currentStatus.consolidated_status),
+      detail: currentStatus.consolidated_status_source ?? "Deterministic reconciliation",
+      meta: currentStatus.consolidated_status_reason ?? "No reconciliation reason available yet"
+    },
     {
       title: "Official status",
       value: labelStatus(currentStatus.official_status),
@@ -204,16 +215,24 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 3 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 4 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>USFS authority parsing and RRMMC partner-status parsing are wired into the portal.</li>
-                <li>Manual owner/audit refresh now supports both weather and status-source ingestion runs.</li>
-                <li>Official and partner observations flow into the current-status view without treating community data as legal closure authority.</li>
-                <li>Forest Service alerts stay separate from community or weather observations for traceable evidence review.</li>
+                <li>Deterministic reconciliation now computes a consolidated road status with an explicit reason and source.</li>
+                <li>Manual recalc logs status events so the portal starts building a traceable change history.</li>
+                <li>USFS closure alerts override partner status, while weather warnings increase risk without silently becoming legal closures.</li>
+                <li>The road page now exposes the current evidence chain and recent reconciliation events.</li>
               </ul>
             </div>
             {canRefresh ? (
               <div className="flex flex-wrap gap-2">
+                <form action={recalcAction}>
+                  <button
+                    type="submit"
+                    className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-50"
+                  >
+                    Recalculate status
+                  </button>
+                </form>
                 <form action={refreshStatusAction}>
                   <button
                     type="submit"
@@ -284,6 +303,27 @@ export default async function RoadPage({
 
         <div className="space-y-6">
           <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <h2 className="text-xl font-semibold text-ink">Reconciliation evidence</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Deterministic rules currently prefer active authoritative USFS closures first, then authoritative status text, then partner status, and never turn weather risk into a legal closure by itself.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-800">Consolidated source</p>
+                <p className="mt-1">{currentStatus.consolidated_status_source ?? "Unknown"}</p>
+                <p className="mt-2 text-slate-600">{currentStatus.consolidated_status_reason ?? "No reconciliation reason available."}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-800">Condition reports</p>
+                <p className="mt-1">{currentStatus.condition_report_count_7d ?? 0} reports in the last 7 days</p>
+                <p className="mt-2 text-slate-600">
+                  Latest verified: {currentStatus.latest_verified_condition_report ?? "No verified field condition report yet."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
             <h2 className="text-xl font-semibold text-ink">Active alerts</h2>
             <p className="mt-2 text-sm text-slate-600">Alerts stay distinct from reconciled road status so weather or community reports do not silently become official closures.</p>
             <div className="mt-5 space-y-3">
@@ -339,6 +379,29 @@ export default async function RoadPage({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <h2 className="text-xl font-semibold text-ink">Recent status events</h2>
+            <p className="mt-2 text-sm text-slate-600">Each manual recalc records whether consolidated status changed or was merely re-confirmed.</p>
+            <div className="mt-5 space-y-3">
+              {recentEvents.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  No status events have been logged yet. Use <strong>Recalculate status</strong> after refreshing source data.
+                </div>
+              ) : (
+                recentEvents.map((event) => (
+                  <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <p className="font-semibold text-slate-800">{event.event_type.replaceAll("_", " ")}</p>
+                    <p className="mt-1">
+                      {event.old_value ?? "unknown"} → {event.new_value ?? "unknown"}
+                    </p>
+                    <p className="mt-2 text-slate-600">{event.description ?? "No event description recorded."}</p>
+                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{formatDateTime(event.detected_at)}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

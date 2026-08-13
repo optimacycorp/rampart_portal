@@ -548,6 +548,10 @@ export type RoadDailySnapshot = {
 export type RoadCurrentStatus = {
   corridor_id: string;
   road_name: string;
+  consolidated_status?: RoadStatus | null;
+  consolidated_status_reason?: string | null;
+  consolidated_status_source?: string | null;
+  consolidated_status_time?: string | null;
   official_status?: RoadStatus | null;
   official_status_time?: string | null;
   official_status_source?: string | null;
@@ -563,6 +567,8 @@ export type RoadCurrentStatus = {
   forecast_snow_inches?: number | null;
   forecast_precip_probability?: number | null;
   latest_condition_report?: string | null;
+  latest_verified_condition_report?: string | null;
+  condition_report_count_7d?: number | null;
   overall_access_risk?: OverallAccessRisk | null;
   last_updated?: string | null;
 };
@@ -571,4 +577,16 @@ export type RoadWeatherLocationSnapshot = {
   location: RoadWeatherLocation;
   latestObservation: WeatherObservation | null;
   nextForecast: WeatherForecast | null;
+};
+
+export type RoadStatusEvent = {
+  id: string;
+  corridor_id: string;
+  event_type: string;
+  old_value?: string | null;
+  new_value?: string | null;
+  detected_at?: string | null;
+  source_id?: string | null;
+  supporting_observation_id?: string | null;
+  description?: string | null;
 };

@@ -6,6 +6,7 @@ import { getCurrentUserContext } from "@/lib/auth-server";
 import { getProjectBySlug } from "@/lib/documents";
 import { fetchNwsForPoint } from "@/lib/nws";
 import { getRoadOverviewByProjectSlug } from "@/lib/road";
+import { getRecentRoadStatusEvents, getRoadCurrentStatusByCorridorId } from "@/lib/road-reconciliation";
 import { fetchRrmmcRoadStatus, mapRrmmcRoadStatus } from "@/lib/rrmmc";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { fetchUsfsRoadStatus } from "@/lib/usfs";
@@ -459,4 +460,61 @@ export async function refreshRoadStatusSources(projectSlug: string) {
 
   revalidatePath(`/projects/${projectSlug}/road`);
   redirect(`/projects/${projectSlug}/road?status=status-refreshed`);
+}
+
+export async function recalculateRoadStatus(projectSlug: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/road?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireRoadRefreshRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/road?error=forbidden`);
+  }
+
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+
+  if (!overview) {
+    redirect(`/projects/${projectSlug}/road?error=project-not-found`);
+  }
+
+  const currentStatus = await getRoadCurrentStatusByCorridorId(overview.corridor.id);
+
+  if (!currentStatus) {
+    redirect(`/projects/${projectSlug}/road?error=recalculation-failed`);
+  }
+
+  const recentEvents = await getRecentRoadStatusEvents(overview.corridor.id, 1);
+  const previousStatus = recentEvents[0]?.new_value ?? null;
+  const nextStatus = currentStatus.consolidated_status ?? "unknown";
+  const sourceId =
+    overview.sources.find((source) => source.provider_key === "portal_system")?.id ??
+    overview.sources.find((source) => source.provider_key === "usfs_psicc")?.id ??
+    null;
+
+  const eventType = previousStatus !== nextStatus ? "status_changed" : "status_recalculated";
+  const description =
+    previousStatus !== nextStatus
+      ? `Road status changed from ${previousStatus ?? "unknown"} to ${nextStatus}. ${currentStatus.consolidated_status_reason ?? ""}`.trim()
+      : `Road status recalculated with no change. ${currentStatus.consolidated_status_reason ?? ""}`.trim();
+
+  const { error } = await supabase.from("road_status_events").insert({
+    corridor_id: overview.corridor.id,
+    event_type: eventType,
+    old_value: previousStatus,
+    new_value: nextStatus,
+    detected_at: new Date().toISOString(),
+    source_id: sourceId,
+    description
+  });
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/road?error=recalculation-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/road`);
+  redirect(`/projects/${projectSlug}/road?status=recalculated`);
 }
