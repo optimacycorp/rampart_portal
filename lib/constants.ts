@@ -68,3 +68,24 @@ export const PLAN_TYPE_HINTS: Record<(typeof PLAN_TYPE_OPTIONS)[number], string>
 
 export const LIDAR_DISCLAIMER =
   "LiDAR point cloud data is provided for project coordination and existing-conditions visualization only. It is not a certified survey, engineering surface, legal boundary determination, or agency-approved grading plan unless reviewed and certified by the appropriate licensed professional.";
+
+export const ROAD_INTELLIGENCE_DISCLAIMER =
+  "Rampart Range Road Intelligence combines information from government agencies, partner organizations, weather services, field observations, and automated data processing. Conditions can change rapidly. Portal information does not constitute authorization to enter or travel upon any road, confirmation of legal access, an official road closure determination, an engineering assessment, or a guarantee that a roadway is safe or passable. Verify access, closures, and current conditions with the responsible agency before travel.";
+
+export const ROAD_STATUS_LABELS = {
+  open: "Open",
+  closed: "Closed",
+  partially_closed: "Partially closed",
+  restricted: "Restricted",
+  seasonal_closure: "Seasonal closure",
+  unknown: "Unknown",
+  not_reported: "Not reported"
+} as const;
+
+export const ROAD_RISK_LABELS = {
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  severe: "Severe",
+  unknown: "Unknown"
+} as const;

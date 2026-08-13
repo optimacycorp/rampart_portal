@@ -301,3 +301,268 @@ export type LidarScan = {
   created_at: string;
   updated_at?: string | null;
 };
+
+export type RoadAuthorityLevel =
+  | "authoritative"
+  | "authoritative_weather"
+  | "partner_observation"
+  | "state_community"
+  | "manual_external";
+
+export type RoadStatus =
+  | "open"
+  | "closed"
+  | "partially_closed"
+  | "restricted"
+  | "seasonal_closure"
+  | "unknown"
+  | "not_reported";
+
+export type GateStatus =
+  | "open"
+  | "closed"
+  | "locked"
+  | "seasonal"
+  | "unknown"
+  | "not_applicable";
+
+export type OverallAccessRisk = "low" | "moderate" | "high" | "severe" | "unknown";
+
+export type RoadCorridor = {
+  id: string;
+  project_id: string;
+  name: string;
+  road_number?: string | null;
+  alternate_names?: string[] | null;
+  managing_agency?: string | null;
+  description?: string | null;
+  start_lat?: number | null;
+  start_lon?: number | null;
+  end_lat?: number | null;
+  end_lon?: number | null;
+  min_elevation_ft?: number | null;
+  max_elevation_ft?: number | null;
+  length_miles?: number | null;
+  active?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type RoadSegment = {
+  id: string;
+  corridor_id: string;
+  segment_name: string;
+  sequence_no?: number | null;
+  start_mile?: number | null;
+  end_mile?: number | null;
+  start_elevation_ft?: number | null;
+  end_elevation_ft?: number | null;
+  avg_grade_percent?: number | null;
+  max_grade_percent?: number | null;
+  avg_width_ft?: number | null;
+  min_width_ft?: number | null;
+  surface_type?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+};
+
+export type RoadDataSource = {
+  id: string;
+  provider_key: string;
+  provider_name: string;
+  source_type: string;
+  authority_level: RoadAuthorityLevel;
+  base_url?: string | null;
+  enabled?: boolean | null;
+  ingestion_method?: string | null;
+  default_refresh_minutes?: number | null;
+  parser_version?: string | null;
+  terms_notes?: string | null;
+  last_success_at?: string | null;
+  last_attempt_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type RoadStatusObservation = {
+  id: string;
+  corridor_id: string;
+  segment_id?: string | null;
+  source_id?: string | null;
+  observed_at: string;
+  fetched_at?: string | null;
+  status: RoadStatus;
+  gate_status?: GateStatus | null;
+  restriction_type?: string | null;
+  summary?: string | null;
+  raw_status_text?: string | null;
+  source_url?: string | null;
+  effective_from?: string | null;
+  effective_until?: string | null;
+  confidence?: number | null;
+  official?: boolean | null;
+  raw_payload?: Record<string, unknown> | null;
+  created_at?: string | null;
+};
+
+export type RoadClosureAlert = {
+  id: string;
+  corridor_id?: string | null;
+  segment_id?: string | null;
+  source_id?: string | null;
+  alert_type?: string | null;
+  severity?: string | null;
+  title: string;
+  description?: string | null;
+  effective_at?: string | null;
+  expires_at?: string | null;
+  active?: boolean | null;
+  forest_order_number?: string | null;
+  source_url?: string | null;
+  source_document_id?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type RoadWeatherLocation = {
+  id: string;
+  corridor_id?: string | null;
+  name: string;
+  latitude: number;
+  longitude: number;
+  elevation_ft?: number | null;
+  station_identifier?: string | null;
+  source?: string | null;
+  active?: boolean | null;
+  created_at?: string | null;
+};
+
+export type WeatherObservation = {
+  id: string;
+  location_id: string;
+  source_id?: string | null;
+  observed_at: string;
+  temperature_f?: number | null;
+  dewpoint_f?: number | null;
+  relative_humidity_percent?: number | null;
+  wind_speed_mph?: number | null;
+  wind_gust_mph?: number | null;
+  wind_direction_deg?: number | null;
+  precipitation_1h_in?: number | null;
+  precipitation_24h_in?: number | null;
+  snow_depth_in?: number | null;
+  visibility_miles?: number | null;
+  pressure_mb?: number | null;
+  weather_description?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  fetched_at?: string | null;
+};
+
+export type WeatherForecast = {
+  id: string;
+  location_id: string;
+  source_id?: string | null;
+  forecast_generated_at?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  temperature_f?: number | null;
+  precipitation_probability?: number | null;
+  snowfall_inches?: number | null;
+  wind_speed_mph?: number | null;
+  wind_gust_mph?: number | null;
+  short_forecast?: string | null;
+  detailed_forecast?: string | null;
+  raw_payload?: Record<string, unknown> | null;
+  fetched_at?: string | null;
+};
+
+export type RoadConditionReport = {
+  id: string;
+  corridor_id?: string | null;
+  segment_id?: string | null;
+  report_source?: string | null;
+  reported_by?: string | null;
+  observed_at: string;
+  condition?: string | null;
+  surface_condition?: string | null;
+  mud_severity?: string | null;
+  snow_severity?: string | null;
+  rut_severity?: string | null;
+  washout?: boolean | null;
+  fallen_tree?: boolean | null;
+  standing_water?: boolean | null;
+  erosion?: boolean | null;
+  passability?: string | null;
+  recommended_vehicle?: string | null;
+  description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  photo_id?: string | null;
+  source_url?: string | null;
+  verified?: boolean | null;
+  created_at?: string | null;
+};
+
+export type RoadFieldMeasurement = {
+  id: string;
+  corridor_id?: string | null;
+  segment_id?: string | null;
+  measurement_type: string;
+  measured_at?: string | null;
+  value?: number | null;
+  units?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  elevation_ft?: number | null;
+  source_equipment?: string | null;
+  source_point_id?: string | null;
+  lidar_scan_id?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+};
+
+export type RoadDailySnapshot = {
+  id: string;
+  corridor_id: string;
+  snapshot_date: string;
+  consolidated_status?: RoadStatus | null;
+  gate_status?: GateStatus | null;
+  status_confidence?: number | null;
+  status_source?: string | null;
+  min_temperature_f?: number | null;
+  max_temperature_f?: number | null;
+  precipitation_24h_in?: number | null;
+  snowfall_24h_in?: number | null;
+  max_wind_gust_mph?: number | null;
+  active_weather_alerts?: number | null;
+  active_usfs_alerts?: number | null;
+  road_condition_score?: number | null;
+  weather_risk_score?: number | null;
+  overall_access_risk?: OverallAccessRisk | null;
+  summary?: string | null;
+  generated_at?: string | null;
+  source_snapshot?: Record<string, unknown> | null;
+};
+
+export type RoadCurrentStatus = {
+  corridor_id: string;
+  road_name: string;
+  official_status?: RoadStatus | null;
+  official_status_time?: string | null;
+  official_status_source?: string | null;
+  partner_status?: RoadStatus | null;
+  partner_status_time?: string | null;
+  gate_status?: GateStatus | null;
+  active_usfs_alert_count?: number | null;
+  active_weather_alert_count?: number | null;
+  temperature_f?: number | null;
+  weather_description?: string | null;
+  wind_mph?: number | null;
+  wind_gust_mph?: number | null;
+  forecast_snow_inches?: number | null;
+  forecast_precip_probability?: number | null;
+  latest_condition_report?: string | null;
+  overall_access_risk?: OverallAccessRisk | null;
+  last_updated?: string | null;
+};

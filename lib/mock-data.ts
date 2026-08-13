@@ -4,6 +4,14 @@ import {
   EvidencePhoto,
   FieldPoint,
   MeetingTranscript,
+  RoadClosureAlert,
+  RoadCorridor,
+  RoadCurrentStatus,
+  RoadDataSource,
+  RoadDailySnapshot,
+  RoadWeatherLocation,
+  WeatherForecast,
+  WeatherObservation,
   Project,
   ProjectTask,
   ReviewerComment
@@ -294,3 +302,210 @@ export const seededEvidencePhotos: EvidencePhoto[] = [
     created_at: new Date().toISOString()
   }
 ];
+
+export const seededRoadCorridor: RoadCorridor = {
+  id: "road-corridor-fs0300",
+  project_id: seededProject.id,
+  name: "Rampart Range Road / FS 0300",
+  road_number: "FS 0300",
+  alternate_names: ["Rampart Range Road", "Forest Road 300", "NFSR 300"],
+  managing_agency: "USDA Forest Service",
+  description:
+    "Primary corridor used for project access coordination, road-condition tracking, weather risk review, and future LiDAR-derived roadway analytics.",
+  min_elevation_ft: 6800,
+  max_elevation_ft: 9200,
+  length_miles: 19.4,
+  active: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
+};
+
+export const seededRoadDataSources: RoadDataSource[] = [
+  {
+    id: "road-source-usfs",
+    provider_key: "usfs_psicc",
+    provider_name: "US Forest Service PSICC",
+    source_type: "closure",
+    authority_level: "authoritative",
+    base_url: "https://www.fs.usda.gov/r02/psicc/recreation/rampart-range-recreation-area",
+    enabled: true,
+    ingestion_method: "http_parse",
+    default_refresh_minutes: 360,
+    parser_version: "seed-v1",
+    terms_notes: "Seeded fallback source until automated ingestion is deployed.",
+    last_success_at: new Date("2026-08-13T08:15:00-06:00").toISOString()
+  },
+  {
+    id: "road-source-rrmmc",
+    provider_key: "rrmmc",
+    provider_name: "Rampart Range Motorized Management Committee",
+    source_type: "road_status",
+    authority_level: "partner_observation",
+    base_url: "https://rampartrange.org/",
+    enabled: true,
+    ingestion_method: "http_parse",
+    default_refresh_minutes: 240,
+    parser_version: "seed-v1",
+    terms_notes: "Partner observation layer; does not override an active USFS order.",
+    last_success_at: new Date("2026-08-13T06:40:00-06:00").toISOString()
+  },
+  {
+    id: "road-source-nws",
+    provider_key: "nws",
+    provider_name: "National Weather Service",
+    source_type: "weather",
+    authority_level: "authoritative_weather",
+    base_url: "https://api.weather.gov/",
+    enabled: true,
+    ingestion_method: "api",
+    default_refresh_minutes: 60,
+    parser_version: "seed-v1",
+    terms_notes: "Weather source for observations, forecasts, and alerts.",
+    last_success_at: new Date("2026-08-13T09:05:00-06:00").toISOString()
+  },
+  {
+    id: "road-source-cotrex",
+    provider_key: "cotrex",
+    provider_name: "Colorado Trail Explorer",
+    source_type: "community_conditions",
+    authority_level: "state_community",
+    base_url: "https://trails.colorado.gov/",
+    enabled: false,
+    ingestion_method: "manual_or_api",
+    default_refresh_minutes: 720,
+    parser_version: "seed-v1",
+    terms_notes: "Second-tier map and condition evidence source only."
+  }
+];
+
+export const seededRoadWeatherLocations: RoadWeatherLocation[] = [
+  {
+    id: "road-weather-lower",
+    corridor_id: seededRoadCorridor.id,
+    name: "3245 Rampart Range",
+    latitude: 38.9209,
+    longitude: -104.6179,
+    elevation_ft: 6970,
+    station_identifier: "RAMPART-LOWER",
+    source: "nws",
+    active: true
+  },
+  {
+    id: "road-weather-mid",
+    corridor_id: seededRoadCorridor.id,
+    name: "Rampart Reservoir vicinity",
+    latitude: 39.0794,
+    longitude: -104.9632,
+    elevation_ft: 9100,
+    station_identifier: "RAMPART-MID",
+    source: "nws",
+    active: true
+  }
+];
+
+export const seededWeatherObservations: WeatherObservation[] = [
+  {
+    id: "road-weather-observation-1",
+    location_id: seededRoadWeatherLocations[0].id,
+    source_id: "road-source-nws",
+    observed_at: new Date("2026-08-13T09:00:00-06:00").toISOString(),
+    temperature_f: 58,
+    relative_humidity_percent: 45,
+    wind_speed_mph: 9,
+    wind_gust_mph: 18,
+    precipitation_24h_in: 0.05,
+    weather_description: "Partly cloudy",
+    fetched_at: new Date("2026-08-13T09:05:00-06:00").toISOString()
+  }
+];
+
+export const seededWeatherForecasts: WeatherForecast[] = [
+  {
+    id: "road-weather-forecast-1",
+    location_id: seededRoadWeatherLocations[0].id,
+    source_id: "road-source-nws",
+    forecast_generated_at: new Date("2026-08-13T08:30:00-06:00").toISOString(),
+    period_start: new Date("2026-08-13T12:00:00-06:00").toISOString(),
+    period_end: new Date("2026-08-13T18:00:00-06:00").toISOString(),
+    temperature_f: 72,
+    precipitation_probability: 25,
+    snowfall_inches: 0,
+    wind_speed_mph: 12,
+    wind_gust_mph: 24,
+    short_forecast: "Isolated thunderstorms after 2 PM",
+    detailed_forecast: "Warm with a slight chance of afternoon storms and gusty outflow winds."
+  }
+];
+
+export const seededRoadAlerts: RoadClosureAlert[] = [
+  {
+    id: "road-alert-1",
+    corridor_id: seededRoadCorridor.id,
+    source_id: "road-source-usfs",
+    alert_type: "seasonal_closure",
+    severity: "info",
+    title: "Seasonal winter closure pattern tracked",
+    description:
+      "Seeded reminder that historical winter closure behavior should be monitored from USFS notices rather than inferred from partner reports.",
+    active: false,
+    source_url: "https://www.fs.usda.gov/r02/psicc/recreation/rampart-range-recreation-area"
+  },
+  {
+    id: "road-alert-2",
+    corridor_id: seededRoadCorridor.id,
+    source_id: "road-source-nws",
+    alert_type: "thunderstorm",
+    severity: "watch",
+    title: "Afternoon thunderstorm risk",
+    description: "Weather-driven caution only. This is not an official road closure or travel authorization notice.",
+    effective_at: new Date("2026-08-13T12:00:00-06:00").toISOString(),
+    expires_at: new Date("2026-08-13T18:00:00-06:00").toISOString(),
+    active: true,
+    source_url: "https://api.weather.gov/"
+  }
+];
+
+export const seededRoadDailySnapshots: RoadDailySnapshot[] = [
+  {
+    id: "road-snapshot-2026-08-13",
+    corridor_id: seededRoadCorridor.id,
+    snapshot_date: "2026-08-13",
+    consolidated_status: "open",
+    gate_status: "open",
+    status_confidence: 0.74,
+    status_source: "rrmmc + seeded fallback",
+    min_temperature_f: 49,
+    max_temperature_f: 72,
+    precipitation_24h_in: 0.05,
+    snowfall_24h_in: 0,
+    max_wind_gust_mph: 24,
+    active_weather_alerts: 1,
+    active_usfs_alerts: 0,
+    road_condition_score: 81,
+    weather_risk_score: 39,
+    overall_access_risk: "moderate",
+    summary: "No active USFS closure detected in fallback data. Weather risk is elevated slightly by possible afternoon thunderstorms."
+  }
+];
+
+export const seededRoadCurrentStatus: RoadCurrentStatus = {
+  corridor_id: seededRoadCorridor.id,
+  road_name: seededRoadCorridor.name,
+  official_status: "unknown",
+  official_status_time: new Date("2026-08-13T08:15:00-06:00").toISOString(),
+  official_status_source: "USFS PSICC fallback seed",
+  partner_status: "open",
+  partner_status_time: new Date("2026-08-13T06:40:00-06:00").toISOString(),
+  gate_status: "open",
+  active_usfs_alert_count: 0,
+  active_weather_alert_count: 1,
+  temperature_f: 58,
+  weather_description: "Partly cloudy",
+  wind_mph: 9,
+  wind_gust_mph: 18,
+  forecast_snow_inches: 0,
+  forecast_precip_probability: 25,
+  latest_condition_report: "Recent portal observation notes rutting near a drainage crossing but no closure evidence.",
+  overall_access_risk: "moderate",
+  last_updated: new Date("2026-08-13T09:05:00-06:00").toISOString()
+};
