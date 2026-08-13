@@ -53,7 +53,9 @@ set
   terms_notes = excluded.terms_notes,
   updated_at = now();
 
-create or replace view road_current_status as
+drop view if exists road_current_status;
+
+create view road_current_status as
 with latest_official as (
   select distinct on (rso.corridor_id)
     rso.id,
