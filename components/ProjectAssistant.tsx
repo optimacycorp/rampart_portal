@@ -22,9 +22,10 @@ type ProjectAssistantProps = {
   projectSlug?: string | null;
   title?: string;
   description?: string;
+  starterQuestions?: string[];
 };
 
-const starterQuestions = [
+const defaultStarterQuestions = [
   "What is the USFS access status?",
   "What items are waiting on the City?",
   "What items are waiting on Dave?",
@@ -46,6 +47,7 @@ function AssistantBody({
   loading: boolean;
   response: AssistantResponse | null;
   onAsk: (value: string) => Promise<void>;
+  starterQuestions: string[];
 }) {
   return (
     <div className="space-y-4 px-5 py-4">
@@ -133,7 +135,8 @@ export function ProjectAssistant({
   embedded = false,
   projectSlug: providedProjectSlug,
   title = "Project Assistant",
-  description = "Status-aware coordination helper with linked sources."
+  description = "Status-aware coordination helper with linked sources.",
+  starterQuestions = defaultStarterQuestions
 }: ProjectAssistantProps = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -208,6 +211,7 @@ export function ProjectAssistant({
           loading={loading}
           response={response}
           onAsk={askAssistant}
+          starterQuestions={starterQuestions}
         />
       </section>
     );
@@ -236,6 +240,7 @@ export function ProjectAssistant({
             loading={loading}
             response={response}
             onAsk={askAssistant}
+            starterQuestions={starterQuestions}
           />
         </div>
       ) : (

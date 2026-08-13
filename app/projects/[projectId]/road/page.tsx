@@ -9,6 +9,7 @@ import {
 } from "@/app/projects/[projectId]/road/actions";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { ProjectAssistant } from "@/components/ProjectAssistant";
 import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
 import { RoadFieldMeasurementForm } from "@/components/RoadFieldMeasurementForm";
 import { getCurrentUserContext } from "@/lib/auth-server";
@@ -244,6 +245,19 @@ export default async function RoadPage({
         <strong>Road intelligence notice:</strong> {ROAD_INTELLIGENCE_DISCLAIMER}
       </div>
       <DisclaimerBanner />
+      <ProjectAssistant
+        embedded
+        projectSlug={projectId}
+        title="Road Analysis"
+        description="Ask road-specific status and evidence questions about closures, weather risk, field reports, LiDAR coverage, and saved roadway measurements."
+        starterQuestions={[
+          "What is the current road status for FS 0300?",
+          "What is the current road weather risk?",
+          "What road evidence do we have from LiDAR and field data?",
+          "Are there any active road alerts right now?",
+          "What recent field road reports are on file?"
+        ]}
+      />
       {query.status && feedbackText[query.status] ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{feedbackText[query.status]}</div>
       ) : null}
@@ -277,12 +291,12 @@ export default async function RoadPage({
         <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-ink">Sprint 7 delivered</h2>
+              <h2 className="text-xl font-semibold text-ink">Sprint 8 delivered</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <li>LiDAR scans, road-specific field points, culverts, and roadway measurements now surface together in the Road workspace.</li>
-                <li>Authorized users can save road width, grade, rut-depth, culvert, and other corridor measurements with optional LiDAR and field-point links.</li>
-                <li>The page now highlights which LiDAR scans and field evidence support road coordination rather than leaving those datasets isolated.</li>
-                <li>This creates the first corridor-geometry evidence layer for future profiles, exports, and engineer review packages.</li>
+                <li>The embedded road analysis assistant now answers road-specific status, weather-risk, field-report, LiDAR, and measurement questions with linked sources.</li>
+                <li>Road questions are routed through structured corridor data instead of relying only on generic project records.</li>
+                <li>LiDAR scans, roadway measurements, field evidence, alerts, and reports now work together as one road-intelligence surface.</li>
+                <li>This closes the first Road Intelligence phase with a queryable, evidence-linked coordination workspace.</li>
               </ul>
             </div>
             {canRefresh ? (

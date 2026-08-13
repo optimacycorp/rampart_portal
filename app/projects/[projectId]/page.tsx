@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { seededProject, seededReviewerComments } from "@/lib/mock-data";
 
 const projectLinks = [
+  { href: "road", label: "Road Intelligence", hint: "Monitor FS 0300 status, weather risk, field reports, LiDAR evidence, and roadway measurements." },
+  { href: "lidar", label: "LiDAR", hint: "Review registered scans, point-cloud metadata, and Potree-ready scan records." },
   { href: "documents", label: "Documents", hint: "Upload and organize recorded instruments and reports." },
   { href: "plans", label: "Plans", hint: "Manage the current site plan, land usability, final plat, and building plan sets." },
   { href: "comments", label: "Reviewer Comments", hint: "Track city, utility, fire, and USFS review items." },

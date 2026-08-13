@@ -4,7 +4,12 @@ import { getCulvertsByProjectId } from "@/lib/culverts";
 import { searchDocumentChunksByProjectSlug } from "@/lib/document-chunks";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getFieldPointsByProjectSlug } from "@/lib/field-points";
+import { getLidarScansByProjectSlug } from "@/lib/lidar";
 import { getProjectTasksByProjectSlug } from "@/lib/project-tasks";
+import { getRoadOverviewByProjectSlug } from "@/lib/road";
+import { getRecentRoadDailySnapshots } from "@/lib/road-history";
+import { getRoadFieldMeasurementsByCorridorId } from "@/lib/road-measurements";
+import { getRoadConditionReportsByCorridorId } from "@/lib/road-reports";
 import { getReviewerCommentsByProjectSlug } from "@/lib/reviewer-comments";
 
 type AssistantSource = {
@@ -86,10 +91,31 @@ function sourceForCulvert(projectSlug: string, culvertId: string): AssistantSour
   };
 }
 
+function sourceForRoadWorkspace(projectSlug: string, label: string): AssistantSource {
+  return {
+    href: `/projects/${projectSlug}/road`,
+    label
+  };
+}
+
+function sourceForLidarScan(projectSlug: string, scanId: string, title: string): AssistantSource {
+  return {
+    href: `/projects/${projectSlug}/lidar/${scanId}`,
+    label: `LiDAR scan: ${title}`
+  };
+}
+
 function classifyQuestion(question: string): "status" | "evidence" | "mixed" {
   const normalized = question.toLowerCase();
 
   if (
+    normalized.includes("road") ||
+    normalized.includes("closure") ||
+    normalized.includes("weather risk") ||
+    normalized.includes("passable") ||
+    normalized.includes("field report") ||
+    normalized.includes("lidar") ||
+    normalized.includes("measurement") ||
     normalized.includes("status") ||
     normalized.includes("waiting on") ||
     normalized.includes("blocking") ||
@@ -112,6 +138,144 @@ function classifyQuestion(question: string): "status" | "evidence" | "mixed" {
   }
 
   return "mixed";
+}
+
+async function answerRoadStatus(projectSlug: string): Promise<AssistantResponsePayload> {
+  const [overview, reports, snapshots] = await Promise.all([
+    getRoadOverviewByProjectSlug(projectSlug),
+    getRoadOverviewByProjectSlug(projectSlug).then((value) =>
+      value ? getRoadConditionReportsByCorridorId(value.corridor.id, 3) : []
+    ),
+    getRoadOverviewByProjectSlug(projectSlug).then((value) =>
+      value ? getRecentRoadDailySnapshots(value.corridor.id, 3) : []
+    )
+  ]);
+
+  if (!overview) {
+    return {
+      type: "status",
+      answer: "Road intelligence is not configured for this project yet.",
+      disclaimer: FULL_DISCLAIMER,
+      sources: []
+    };
+  }
+
+  const sources = [
+    sourceForRoadWorkspace(projectSlug, "Road workspace"),
+    ...overview.activeAlerts.map((alert) => sourceForRoadWorkspace(projectSlug, `Road alert: ${alert.title}`)),
+    ...reports.map((report) => sourceForRoadWorkspace(projectSlug, `Road report: ${report.condition ?? "Condition report"}`))
+  ];
+
+  const answerParts = [
+    `Current consolidated road status is ${overview.currentStatus.consolidated_status ?? "unknown"} with ${overview.currentStatus.overall_access_risk ?? "unknown"} access risk.`,
+    overview.currentStatus.consolidated_status_reason
+      ? `Reason: ${overview.currentStatus.consolidated_status_reason}.`
+      : `Source: ${overview.currentStatus.consolidated_status_source ?? "deterministic reconciliation"}.`,
+    `Official status is ${overview.currentStatus.official_status ?? "unknown"} and partner status is ${overview.currentStatus.partner_status ?? "unknown"}.`,
+    overview.activeAlerts.length > 0
+      ? `Active alerts: ${overview.activeAlerts.slice(0, 3).map((alert) => alert.title).join(", ")}.`
+      : "No active road alerts are stored right now.",
+    reports.length > 0
+      ? `Recent field reports: ${reports.map((report) => report.condition ?? "Condition report").join("; ")}.`
+      : "No recent field road reports are stored.",
+    snapshots[0]?.summary ? `Latest snapshot: ${snapshots[0].summary}` : ""
+  ].filter(Boolean);
+
+  return {
+    type: "status",
+    answer: answerParts.join(" "),
+    disclaimer: FULL_DISCLAIMER,
+    sources: uniqueSources(sources)
+  };
+}
+
+async function answerRoadWeatherRisk(projectSlug: string): Promise<AssistantResponsePayload> {
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+
+  if (!overview) {
+    return {
+      type: "status",
+      answer: "Road weather intelligence is not configured for this project yet.",
+      disclaimer: FULL_DISCLAIMER,
+      sources: []
+    };
+  }
+
+  const weatherLines = overview.weatherSnapshots.slice(0, 3).map((snapshot) => {
+    const observation = snapshot.latestObservation;
+    const forecast = snapshot.nextForecast;
+
+    return `${snapshot.location.name}: ${observation?.temperature_f ?? "unknown"} F, ${
+      observation?.weather_description ?? "no current condition"
+    }, wind ${observation?.wind_speed_mph ?? "?"} mph, POP ${forecast?.precipitation_probability ?? "?"}%${forecast?.snowfall_inches != null ? `, snow ${forecast.snowfall_inches} in` : ""}`;
+  });
+
+  return {
+    type: "status",
+    answer: [
+      `Current road weather risk is ${overview.currentStatus.overall_access_risk ?? "unknown"}.`,
+      weatherLines.length > 0 ? `Weather sample sites: ${weatherLines.join("; ")}.` : "No weather sample sites are populated.",
+      overview.currentStatus.active_weather_alert_count
+        ? `${overview.currentStatus.active_weather_alert_count} active weather alerts are influencing the corridor risk picture.`
+        : "No active weather alerts are currently stored."
+    ].join(" "),
+    disclaimer: FULL_DISCLAIMER,
+    sources: uniqueSources([sourceForRoadWorkspace(projectSlug, "Road weather and risk")])
+  };
+}
+
+async function answerRoadEvidence(projectSlug: string): Promise<AssistantResponsePayload> {
+  const project = await getProjectBySlug(projectSlug);
+  const overview = await getRoadOverviewByProjectSlug(projectSlug);
+
+  if (!project || !overview) {
+    return {
+      type: "evidence",
+      answer: "Road evidence records are not configured for this project yet.",
+      disclaimer: FULL_DISCLAIMER,
+      sources: []
+    };
+  }
+
+  const [culverts, roadMeasurements, lidarScans, fieldPoints] = await Promise.all([
+    getCulvertsByProjectId(project.id),
+    getRoadFieldMeasurementsByCorridorId(overview.corridor.id, 8),
+    getLidarScansByProjectSlug(projectSlug),
+    getFieldPointsByProjectSlug(projectSlug)
+  ]);
+
+  const roadFieldPoints = fieldPoints.filter((point) =>
+    ["road_edge", "gate", "turnout", "driveway", "culvert_inlet", "culvert_outlet", "ditch", "swale", "berm", "photo_station"].includes(point.point_type)
+  );
+
+  const sources = [
+    sourceForRoadWorkspace(projectSlug, "Road evidence workspace"),
+    ...roadMeasurements.map((measurement) =>
+      sourceForRoadWorkspace(projectSlug, `Measurement: ${measurement.measurement_type}`)
+    ),
+    ...lidarScans.slice(0, 4).map((scan) => sourceForLidarScan(projectSlug, scan.id, scan.title)),
+    ...roadFieldPoints.slice(0, 6).map((point) => sourceForFieldPoint(projectSlug, point.id, point.point_name)),
+    ...culverts.slice(0, 6).map((culvert) => sourceForCulvert(projectSlug, culvert.culvert_id))
+  ];
+
+  const answerParts = [
+    `${lidarScans.length} LiDAR scans are registered for road review.`,
+    `${roadMeasurements.length} saved roadway measurements are currently available.`,
+    `${roadFieldPoints.length} road-linked field points and ${culverts.length} culvert records support the corridor evidence set.`,
+    roadMeasurements.length > 0
+      ? `Recent measurements: ${roadMeasurements
+          .slice(0, 4)
+          .map((measurement) => `${measurement.measurement_type.replaceAll("_", " ")} ${measurement.value ?? "?"} ${measurement.units ?? ""}`.trim())
+          .join("; ")}.`
+      : "No roadway measurements have been saved yet."
+  ];
+
+  return {
+    type: "evidence",
+    answer: answerParts.join(" "),
+    disclaimer: FULL_DISCLAIMER,
+    sources: uniqueSources(sources)
+  };
 }
 
 async function answerWaitingResponses(projectSlug: string): Promise<AssistantResponsePayload> {
@@ -409,6 +573,28 @@ export async function answerAssistantQuestion(projectSlug: string, question: str
   const normalized = question.trim().toLowerCase();
   const type = classifyQuestion(question);
 
+  if (
+    normalized.includes("road status") ||
+    normalized.includes("closure") ||
+    normalized.includes("passable") ||
+    normalized.includes("fs 0300")
+  ) {
+    return answerRoadStatus(projectSlug);
+  }
+
+  if (normalized.includes("weather risk") || (normalized.includes("road") && normalized.includes("weather"))) {
+    return answerRoadWeatherRisk(projectSlug);
+  }
+
+  if (
+    normalized.includes("lidar") ||
+    normalized.includes("measurement") ||
+    normalized.includes("road evidence") ||
+    normalized.includes("scan support")
+  ) {
+    return answerRoadEvidence(projectSlug);
+  }
+
   if (normalized.includes("waiting responses") || normalized.includes("waiting on")) {
     return answerWaitingResponses(projectSlug);
   }
@@ -436,15 +622,17 @@ export async function answerAssistantQuestion(projectSlug: string, question: str
 }
 
 export async function getAssistantStatusSnapshot(projectSlug: string) {
-  const [comments, tasks, accessLogs] = await Promise.all([
+  const [comments, tasks, accessLogs, roadOverview] = await Promise.all([
     getReviewerCommentsByProjectSlug(projectSlug),
     getProjectTasksByProjectSlug(projectSlug),
-    getAccessLogsByProjectSlug(projectSlug)
+    getAccessLogsByProjectSlug(projectSlug),
+    getRoadOverviewByProjectSlug(projectSlug)
   ]);
 
   return {
     openComments: comments.filter((comment) => comment.status !== "resolved" && comment.status !== "deferred"),
     tasks,
-    accessLogs
+    accessLogs,
+    roadOverview
   };
 }
