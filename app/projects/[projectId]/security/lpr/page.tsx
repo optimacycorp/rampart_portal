@@ -61,7 +61,7 @@ export default async function LprPage({
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-ink">Camera library</h2>
-              <p className="mt-2 text-sm text-slate-600">Sprint 1 establishes the register for solar LPR cameras, power budgets, network path, and last-seen telemetry.</p>
+              <p className="mt-2 text-sm text-slate-600">Register solar LPR cameras, power budgets, network path details, and last-seen telemetry in one place.</p>
             </div>
             <span className="text-sm text-slate-500">{cameras.length} cameras</span>
           </div>
@@ -100,7 +100,7 @@ export default async function LprPage({
 
         <div className="space-y-6">
           <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-              <h2 className="text-xl font-semibold text-ink">Sprint 3 privacy and review controls</h2>
+              <h2 className="text-xl font-semibold text-ink">Privacy and review controls</h2>
               <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
               <li>Known vehicles can now be registered as authorized, vendor, watchlist, or blocked so event triage is no longer just raw plate review.</li>
               <li>Owner and audit users can record per-event workflow decisions and link captures to known vehicles.</li>

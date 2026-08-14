@@ -29,7 +29,7 @@ export default async function FieldPointImportPage({
       <PageHeader
         eyebrow="GPS Import"
         title="CSV import workflow"
-        description="Sprint 1 import flow includes CSV upload, manual column mapping, validation, missing-coordinate flags, preview, and save."
+        description="Import flow includes CSV upload, manual column mapping, validation, missing-coordinate flags, preview, and save."
       />
       {query.error && feedbackText[query.error] ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">

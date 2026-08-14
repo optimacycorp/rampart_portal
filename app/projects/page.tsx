@@ -8,7 +8,7 @@ export default function ProjectsPage() {
       <PageHeader
         eyebrow="Projects"
         title="Project index"
-        description="Sprint 1 begins with a single seeded Rampart Range record, but the data model supports additional projects as evidence sets grow."
+        description="The portal currently opens with a single Rampart Range record, and the data model supports additional projects as evidence sets grow."
       />
       <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
