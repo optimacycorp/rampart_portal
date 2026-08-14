@@ -713,6 +713,6 @@ export type RoadIngestionRun = {
 export type RoadSourceHealth = {
   source: RoadDataSource;
   latestRun: RoadIngestionRun | null;
-  freshness: "current" | "aging" | "stale" | "failed" | "never";
+  freshness: "current" | "aging" | "stale" | "failed" | "never" | "disabled";
   failureCount7d: number;
 };

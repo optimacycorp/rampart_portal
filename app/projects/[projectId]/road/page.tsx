@@ -75,7 +75,7 @@ function statusTone(value?: RoadStatus | null) {
   }
 }
 
-function healthTone(value: "current" | "aging" | "stale" | "failed" | "never") {
+function healthTone(value: "current" | "aging" | "stale" | "failed" | "never" | "disabled") {
   switch (value) {
     case "current":
       return "bg-emerald-100 text-emerald-900";
@@ -85,6 +85,8 @@ function healthTone(value: "current" | "aging" | "stale" | "failed" | "never") {
       return "bg-orange-100 text-orange-900";
     case "failed":
       return "bg-rose-100 text-rose-900";
+    case "disabled":
+      return "bg-slate-200 text-slate-700";
     default:
       return "bg-slate-100 text-slate-700";
   }
@@ -600,7 +602,9 @@ export default async function RoadPage({
           </div>
           <div className="mt-5 space-y-4">
             {sourceHealth.map((entry) => {
-              const freshness = entry.latestRun?.status === "failed"
+              const freshness = entry.freshness === "disabled"
+                ? { label: "Disabled", className: healthTone("disabled") }
+                : entry.latestRun?.status === "failed"
                 ? { label: "Failed", className: healthTone("failed") }
                 : {
                     label: entry.freshness[0].toUpperCase() + entry.freshness.slice(1),
@@ -621,10 +625,13 @@ export default async function RoadPage({
                     <p>Cadence: {entry.source.default_refresh_minutes ? `${entry.source.default_refresh_minutes} min` : "Pending"}</p>
                     <p>Method: {entry.source.ingestion_method ?? "Pending"}</p>
                     <p>Last success: {formatDateTime(entry.source.last_success_at)}</p>
-                    <p>Latest run: {entry.latestRun?.status ?? "Never run"}</p>
+                    <p>Latest run: {entry.source.enabled === false ? "Disabled" : entry.latestRun?.status ?? "Never run"}</p>
                     <p>Parser version: {entry.latestRun?.parser_version ?? entry.source.parser_version ?? "Pending"}</p>
                     <p>7d failures: {entry.failureCount7d}</p>
                   </div>
+                  {entry.source.enabled === false ? (
+                    <p className="mt-3 text-sm text-slate-600">This source is currently disabled and is not expected to refresh automatically.</p>
+                  ) : null}
                   {entry.latestRun?.error_message ? (
                     <p className="mt-3 text-sm text-rose-700">{entry.latestRun.error_message}</p>
                   ) : null}

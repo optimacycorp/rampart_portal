@@ -4,7 +4,12 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_NWS_USER_AGENT = "(rampart-range.org, admin@rampart-range.org)";
-const RRMMC_HOME_URL = "https://rampartrange.org/";
+const RRMMC_STATUS_URLS = [
+  "https://rampartrange.org/",
+  "https://www.rampartrange.org/",
+  "https://rampartrange.org/trail-info/",
+  "https://rampartrange.org/events/"
+];
 const USFS_FIRE_RESTRICTIONS_URL = "https://www.fs.usda.gov/r02/psicc/fire/fire-restrictions";
 const USFS_RAMPART_RECREATION_URL = "https://www.fs.usda.gov/r02/psicc/recreation/trails/rampart-reservoir-trail-700";
 
@@ -317,29 +322,41 @@ function mapRoadStatus(status) {
 }
 
 async function fetchRrmmcRoadStatus() {
-  const html = await fetchText(RRMMC_HOME_URL, {
+  const headers = {
     "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || DEFAULT_NWS_USER_AGENT
-  });
-  const text = stripHtmlTags(html);
-  const trailStatus = parseRrmmcStatusValue(text, "Trail Status");
-  const roadStatus = parseRrmmcStatusValue(text, "Rampart Range Road Status");
+  };
+  const errors = [];
 
-  if (!roadStatus) {
-    throw new Error("RRMMC parser could not find Rampart Range Road Status on the homepage.");
+  for (const url of RRMMC_STATUS_URLS) {
+    try {
+      const html = await fetchText(url, headers);
+      const text = stripHtmlTags(html);
+      const trailStatus = parseRrmmcStatusValue(text, "Trail Status");
+      const roadStatus = parseRrmmcStatusValue(text, "Rampart Range Road Status");
+
+      if (!roadStatus) {
+        errors.push(`No road status found at ${url}`);
+        continue;
+      }
+
+      return {
+        trailStatus,
+        roadStatus,
+        summary: `RRMMC reports Trail Status: ${trailStatus ?? "unknown"} and Rampart Range Road Status: ${roadStatus}.`,
+        sourceUrl: url,
+        rawStatusText: roadStatus,
+        rawPayload: {
+          trail_status: trailStatus,
+          road_status: roadStatus,
+          extracted_text: text.slice(0, 4000)
+        }
+      };
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `Unknown RRMMC error at ${url}`);
+    }
   }
 
-  return {
-    trailStatus,
-    roadStatus,
-    summary: `RRMMC reports Trail Status: ${trailStatus ?? "unknown"} and Rampart Range Road Status: ${roadStatus}.`,
-    sourceUrl: RRMMC_HOME_URL,
-    rawStatusText: roadStatus,
-    rawPayload: {
-      trail_status: trailStatus,
-      road_status: roadStatus,
-      extracted_text: text.slice(0, 4000)
-    }
-  };
+  throw new Error(`RRMMC status fetch failed. ${errors.join(" | ")}`);
 }
 
 function inferAlertType(title) {
@@ -408,14 +425,24 @@ async function fetchUsfsRoadStatus() {
     "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || DEFAULT_NWS_USER_AGENT
   };
 
-  const [fireHtml, recreationHtml] = await Promise.all([
+  const [fireResult, recreationResult] = await Promise.allSettled([
     fetchText(USFS_FIRE_RESTRICTIONS_URL, headers),
     fetchText(USFS_RAMPART_RECREATION_URL, headers)
   ]);
 
-  const fireText = stripHtmlTags(fireHtml);
-  const recreationText = stripHtmlTags(recreationHtml);
-  const alertLinks = parseUsfsAlertLinks(fireHtml);
+  if (fireResult.status === "rejected" && recreationResult.status === "rejected") {
+    throw new Error(
+      `USFS fetch failed. Fire page: ${fireResult.reason instanceof Error ? fireResult.reason.message : "unknown"} | Recreation page: ${
+        recreationResult.reason instanceof Error ? recreationResult.reason.message : "unknown"
+      }`
+    );
+  }
+
+  const fireHtml = fireResult.status === "fulfilled" ? fireResult.value : "";
+  const recreationHtml = recreationResult.status === "fulfilled" ? recreationResult.value : "";
+  const fireText = fireHtml ? stripHtmlTags(fireHtml) : "";
+  const recreationText = recreationHtml ? stripHtmlTags(recreationHtml) : "";
+  const alertLinks = fireHtml ? parseUsfsAlertLinks(fireHtml) : [];
   const fireRestrictionHeading = fireText.match(/Stage\s+[12]\s+Fire Restrictions/i)?.[0] ?? null;
   const seasonalClosureText = parseRampartSeasonalClosureText(recreationText);
 
@@ -476,6 +503,14 @@ async function fetchUsfsRoadStatus() {
 
   if (summaryParts.length === 0) {
     summaryParts.push("No active USFS closure or restriction text was parsed from the current source pages.");
+  }
+
+  if (fireResult.status === "rejected") {
+    summaryParts.push("USFS fire restrictions page could not be fetched during this run.");
+  }
+
+  if (recreationResult.status === "rejected") {
+    summaryParts.push("USFS recreation page could not be fetched during this run.");
   }
 
   return {
@@ -932,6 +967,22 @@ async function refreshRoadStatusSources(supabase, overview) {
 }
 
 async function recalculateRoadStatus(supabase, overview) {
+  const portalSystemSource =
+    overview.sources.find((source) => source.provider_key === "portal_system") ??
+    overview.sources.find((source) => source.provider_key === "usfs_psicc") ??
+    null;
+  let portalRunId = null;
+
+  if (portalSystemSource) {
+    portalRunId = await createRun(
+      supabase,
+      portalSystemSource.id,
+      "cron-portal-reconciliation",
+      portalSystemSource.parser_version ?? "portal-cron-v1",
+      { corridor_id: overview.corridor.id }
+    );
+  }
+
   const { data: currentStatus, error: currentStatusError } = await supabase
     .from("road_current_status")
     .select("*")
@@ -939,6 +990,13 @@ async function recalculateRoadStatus(supabase, overview) {
     .maybeSingle();
 
   if (currentStatusError || !currentStatus) {
+    if (portalRunId) {
+      await markRunFailure(
+        supabase,
+        portalRunId,
+        currentStatusError?.message ?? "Current road status view could not be loaded."
+      );
+    }
     throw new Error("Current road status view could not be loaded.");
   }
 
@@ -950,6 +1008,9 @@ async function recalculateRoadStatus(supabase, overview) {
     .limit(1);
 
   if (recentEventsError) {
+    if (portalRunId) {
+      await markRunFailure(supabase, portalRunId, recentEventsError.message);
+    }
     throw recentEventsError;
   }
 
@@ -976,7 +1037,35 @@ async function recalculateRoadStatus(supabase, overview) {
     description
   });
 
-  if (error) throw error;
+  if (error) {
+    if (portalRunId) {
+      await markRunFailure(supabase, portalRunId, error.message);
+    }
+    throw error;
+  }
+
+  if (portalSystemSource) {
+    await updateSourceSuccess(
+      supabase,
+      portalSystemSource.id,
+      portalSystemSource.parser_version ?? "portal-cron-v1"
+    );
+  }
+
+  if (portalRunId) {
+    await markRunSuccess(supabase, portalRunId, {
+      records_received: 1,
+      records_inserted: 1,
+      records_updated: 0,
+      http_status: 200,
+      metadata: {
+        corridor_id: overview.corridor.id,
+        previous_status: previousStatus,
+        next_status: nextStatus,
+        event_type: eventType
+      }
+    });
+  }
 
   return {
     previousStatus,

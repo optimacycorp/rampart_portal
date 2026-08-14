@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdminClient } from "@/lib/supabase";
-import { RoadDailySnapshot, RoadIngestionRun, RoadSourceHealth } from "@/lib/types";
+import { RoadDailySnapshot, RoadDataSource, RoadIngestionRun, RoadSourceHealth } from "@/lib/types";
 
 export async function getRecentRoadDailySnapshots(corridorId: string, limit = 10): Promise<RoadDailySnapshot[]> {
   const supabase = getSupabaseAdminClient();
@@ -26,7 +26,15 @@ export async function getRecentRoadDailySnapshots(corridorId: string, limit = 10
   return data as RoadDailySnapshot[];
 }
 
-function resolveFreshness(latestRun: RoadIngestionRun | null, lastSuccessAt?: string | null): RoadSourceHealth["freshness"] {
+function resolveFreshness(
+  source: Pick<RoadDataSource, "enabled" | "ingestion_method">,
+  latestRun: RoadIngestionRun | null,
+  lastSuccessAt?: string | null
+): RoadSourceHealth["freshness"] {
+  if (source.enabled === false) {
+    return "disabled";
+  }
+
   if (!latestRun && !lastSuccessAt) {
     return "never";
   }
@@ -90,7 +98,7 @@ export async function getRoadSourceHealth(corridorId: string): Promise<RoadSourc
     return {
       source,
       latestRun,
-      freshness: resolveFreshness(latestRun, source.last_success_at),
+      freshness: resolveFreshness(source, latestRun, source.last_success_at),
       failureCount7d
     };
   });

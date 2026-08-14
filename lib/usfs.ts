@@ -101,21 +101,38 @@ export async function fetchUsfsRoadStatus() {
     "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || "(rampart-range.org, admin@rampart-range.org)"
   };
 
-  const [fireRestrictionsResponse, recreationResponse] = await Promise.all([
+  const [fireRestrictionsResult, recreationResult] = await Promise.allSettled([
     fetch(USFS_FIRE_RESTRICTIONS_URL, { headers, next: { revalidate: 0 } }),
     fetch(USFS_RAMPART_RECREATION_URL, { headers, next: { revalidate: 0 } })
   ]);
 
-  if (!fireRestrictionsResponse.ok) {
-    throw new Error(`USFS fire restrictions request failed (${fireRestrictionsResponse.status}) for ${USFS_FIRE_RESTRICTIONS_URL}`);
+  if (fireRestrictionsResult.status === "rejected" && recreationResult.status === "rejected") {
+    throw new Error(
+      `USFS fetch failed. Fire page: ${fireRestrictionsResult.reason instanceof Error ? fireRestrictionsResult.reason.message : "unknown"} | Recreation page: ${
+        recreationResult.reason instanceof Error ? recreationResult.reason.message : "unknown"
+      }`
+    );
   }
 
-  if (!recreationResponse.ok) {
-    throw new Error(`USFS recreation request failed (${recreationResponse.status}) for ${USFS_RAMPART_RECREATION_URL}`);
+  if (
+    fireRestrictionsResult.status === "fulfilled" &&
+    !fireRestrictionsResult.value.ok &&
+    recreationResult.status === "fulfilled" &&
+    !recreationResult.value.ok
+  ) {
+    throw new Error(
+      `USFS fetch failed. Fire page: request failed (${fireRestrictionsResult.value.status}) for ${USFS_FIRE_RESTRICTIONS_URL} | Recreation page: request failed (${recreationResult.value.status}) for ${USFS_RAMPART_RECREATION_URL}`
+    );
   }
 
-  const fireHtml = await fireRestrictionsResponse.text();
-  const recreationHtml = await recreationResponse.text();
+  const fireHtml =
+    fireRestrictionsResult.status === "fulfilled" && fireRestrictionsResult.value.ok
+      ? await fireRestrictionsResult.value.text()
+      : "";
+  const recreationHtml =
+    recreationResult.status === "fulfilled" && recreationResult.value.ok
+      ? await recreationResult.value.text()
+      : "";
   const fireText = stripHtmlTags(fireHtml);
   const recreationText = stripHtmlTags(recreationHtml);
 
@@ -180,6 +197,18 @@ export async function fetchUsfsRoadStatus() {
 
   if (summaryParts.length === 0) {
     summaryParts.push("No active USFS closure or restriction text was parsed from the current source pages.");
+  }
+
+  if (fireRestrictionsResult.status === "rejected") {
+    summaryParts.push("USFS fire restrictions page could not be fetched during this run.");
+  } else if (!fireRestrictionsResult.value.ok) {
+    summaryParts.push(`USFS fire restrictions page returned ${fireRestrictionsResult.value.status} during this run.`);
+  }
+
+  if (recreationResult.status === "rejected") {
+    summaryParts.push("USFS recreation page could not be fetched during this run.");
+  } else if (!recreationResult.value.ok) {
+    summaryParts.push(`USFS recreation page returned ${recreationResult.value.status} during this run.`);
   }
 
   return {

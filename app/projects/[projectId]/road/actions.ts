@@ -25,6 +25,39 @@ async function requireRoadRefreshRole() {
   return { user, role };
 }
 
+async function createPortalSystemRun(supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>, overview: Awaited<ReturnType<typeof getRoadOverviewByProjectSlug>>) {
+  const portalSystemSource = overview?.sources.find((source) => source.provider_key === "portal_system");
+
+  if (!portalSystemSource) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("road_ingestion_runs")
+    .insert({
+      source_id: portalSystemSource.id,
+      job_name: "manual-portal-reconciliation",
+      started_at: new Date().toISOString(),
+      status: "running",
+      parser_version: portalSystemSource.parser_version ?? "portal-manual-v1",
+      metadata: {
+        corridor_id: overview?.corridor.id
+      }
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    runId: data.id as string,
+    sourceId: portalSystemSource.id,
+    parserVersion: portalSystemSource.parser_version ?? "portal-manual-v1"
+  };
+}
+
 function readFormString(formData: FormData, key: string) {
   const value = `${formData.get(key) ?? ""}`.trim();
   return value || null;
@@ -330,8 +363,11 @@ export async function refreshRoadStatusSources(projectSlug: string) {
     redirect(`/projects/${projectSlug}/road?error=refresh-start-failed`);
   }
 
+  let rrmmcSucceeded = false;
+  let usfsSucceeded = false;
+
   try {
-    const [rrmmc, usfs] = await Promise.all([fetchRrmmcRoadStatus(), fetchUsfsRoadStatus()]);
+    const rrmmc = await fetchRrmmcRoadStatus();
 
     const rrmmcInsert = await supabase.from("road_status_observations").insert({
       corridor_id: overview.corridor.id,
@@ -377,6 +413,31 @@ export async function refreshRoadStatusSources(projectSlug: string) {
         }
       })
       .eq("id", rrmmcRun.id);
+
+    rrmmcSucceeded = true;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected RRMMC refresh failure.";
+
+    await supabase
+      .from("road_ingestion_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "failed",
+        error_message: message
+      })
+      .eq("id", rrmmcRun.id);
+
+    await supabase
+      .from("road_data_sources")
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", rrmmcSource.id);
+  }
+
+  try {
+    const usfs = await fetchUsfsRoadStatus();
 
     await supabase
       .from("road_closures_alerts")
@@ -459,8 +520,10 @@ export async function refreshRoadStatusSources(projectSlug: string) {
         }
       })
       .eq("id", usfsRun.id);
+
+    usfsSucceeded = true;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unexpected road status refresh failure.";
+    const message = error instanceof Error ? error.message : "Unexpected USFS refresh failure.";
 
     await supabase
       .from("road_ingestion_runs")
@@ -469,7 +532,7 @@ export async function refreshRoadStatusSources(projectSlug: string) {
         status: "failed",
         error_message: message
       })
-      .in("id", [rrmmcRun.id, usfsRun.id]);
+      .eq("id", usfsRun.id);
 
     await supabase
       .from("road_data_sources")
@@ -477,8 +540,10 @@ export async function refreshRoadStatusSources(projectSlug: string) {
         last_attempt_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .in("id", [rrmmcSource.id, usfsSource.id]);
+      .eq("id", usfsSource.id);
+  }
 
+  if (!rrmmcSucceeded && !usfsSucceeded) {
     redirect(`/projects/${projectSlug}/road?error=status-refresh-failed`);
   }
 
@@ -504,6 +569,8 @@ export async function recalculateRoadStatus(projectSlug: string) {
   if (!overview) {
     redirect(`/projects/${projectSlug}/road?error=project-not-found`);
   }
+
+  const portalRun = await createPortalSystemRun(supabase, overview);
 
   const currentStatus = await getRoadCurrentStatusByCorridorId(overview.corridor.id);
 
@@ -536,7 +603,45 @@ export async function recalculateRoadStatus(projectSlug: string) {
   });
 
   if (error) {
+    if (portalRun) {
+      await supabase
+        .from("road_ingestion_runs")
+        .update({
+          completed_at: new Date().toISOString(),
+          status: "failed",
+          error_message: error.message
+        })
+        .eq("id", portalRun.runId);
+    }
     redirect(`/projects/${projectSlug}/road?error=recalculation-failed`);
+  }
+
+  if (portalRun) {
+    await supabase
+      .from("road_data_sources")
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        last_success_at: new Date().toISOString(),
+        parser_version: portalRun.parserVersion,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", portalRun.sourceId);
+
+    await supabase
+      .from("road_ingestion_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "success",
+        records_received: 1,
+        records_inserted: 1,
+        records_updated: 0,
+        http_status: 200,
+        metadata: {
+          corridor_id: overview.corridor.id,
+          reconciliation_status: currentStatus.consolidated_status ?? "unknown"
+        }
+      })
+      .eq("id", portalRun.runId);
   }
 
   revalidatePath(`/projects/${projectSlug}/road`);

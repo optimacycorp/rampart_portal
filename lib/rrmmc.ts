@@ -2,7 +2,12 @@ import "server-only";
 
 import { normalizeWhitespace, stripHtmlTags } from "@/lib/html";
 
-const RRMMC_HOME_URL = "https://rampartrange.org/";
+const RRMMC_STATUS_URLS = [
+  "https://rampartrange.org/",
+  "https://www.rampartrange.org/",
+  "https://rampartrange.org/trail-info/",
+  "https://rampartrange.org/events/"
+];
 
 export type RrmmcFetchResult = {
   trailStatus: string | null;
@@ -45,36 +50,48 @@ export function mapRrmmcRoadStatus(status: string | null) {
 }
 
 export async function fetchRrmmcRoadStatus() {
-  const response = await fetch(RRMMC_HOME_URL, {
-    headers: {
-      "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || "(rampart-range.org, admin@rampart-range.org)"
-    },
-    next: { revalidate: 0 }
-  });
+  const errors: string[] = [];
 
-  if (!response.ok) {
-    throw new Error(`RRMMC request failed (${response.status}) for ${RRMMC_HOME_URL}`);
-  }
+  for (const sourceUrl of RRMMC_STATUS_URLS) {
+    try {
+      const response = await fetch(sourceUrl, {
+        headers: {
+          "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || "(rampart-range.org, admin@rampart-range.org)"
+        },
+        next: { revalidate: 0 }
+      });
 
-  const html = await response.text();
-  const text = stripHtmlTags(html);
-  const trailStatus = parseStatusValue(text, "Trail Status");
-  const roadStatus = parseStatusValue(text, "Rampart Range Road Status");
+      if (!response.ok) {
+        errors.push(`RRMMC request failed (${response.status}) for ${sourceUrl}`);
+        continue;
+      }
 
-  if (!roadStatus) {
-    throw new Error("RRMMC parser could not find Rampart Range Road Status on the homepage.");
-  }
+      const html = await response.text();
+      const text = stripHtmlTags(html);
+      const trailStatus = parseStatusValue(text, "Trail Status");
+      const roadStatus = parseStatusValue(text, "Rampart Range Road Status");
 
-  return {
-    trailStatus,
-    roadStatus,
-    summary: `RRMMC reports Trail Status: ${trailStatus ?? "unknown"} and Rampart Range Road Status: ${roadStatus}.`,
-    sourceUrl: RRMMC_HOME_URL,
-    rawStatusText: roadStatus,
-    rawPayload: {
-      trail_status: trailStatus,
-      road_status: roadStatus,
-      extracted_text: text.slice(0, 4000)
+      if (!roadStatus) {
+        errors.push(`RRMMC parser could not find Rampart Range Road Status at ${sourceUrl}.`);
+        continue;
+      }
+
+      return {
+        trailStatus,
+        roadStatus,
+        summary: `RRMMC reports Trail Status: ${trailStatus ?? "unknown"} and Rampart Range Road Status: ${roadStatus}.`,
+        sourceUrl,
+        rawStatusText: roadStatus,
+        rawPayload: {
+          trail_status: trailStatus,
+          road_status: roadStatus,
+          extracted_text: text.slice(0, 4000)
+        }
+      } satisfies RrmmcFetchResult;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `Unknown RRMMC error at ${sourceUrl}`);
     }
-  } satisfies RrmmcFetchResult;
+  }
+
+  throw new Error(`RRMMC status fetch failed. ${errors.join(" | ")}`);
 }
