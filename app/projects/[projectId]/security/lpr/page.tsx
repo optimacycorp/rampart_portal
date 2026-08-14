@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeader } from "@/components/PageHeader";
 import { getProjectBySlug } from "@/lib/documents";
-import { getLprCamerasByProjectSlug, getLprDailyStatsByProjectSlug, getLprEventsByProjectSlug } from "@/lib/lpr";
+import { getLprCamerasByProjectSlug, getLprDailyStatsByProjectSlug, getLprEventsByProjectSlug, getLprKnownVehiclesByProjectSlug } from "@/lib/lpr";
 
 function formatDateTime(value?: string | null) {
   return value ? new Date(value).toLocaleString() : "Not recorded";
@@ -14,11 +14,12 @@ export default async function LprPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const [project, cameras, events, stats] = await Promise.all([
+  const [project, cameras, events, stats, knownVehicles] = await Promise.all([
     getProjectBySlug(projectId),
     getLprCamerasByProjectSlug(projectId),
     getLprEventsByProjectSlug(projectId, 10),
-    getLprDailyStatsByProjectSlug(projectId, 7)
+    getLprDailyStatsByProjectSlug(projectId, 7),
+    getLprKnownVehiclesByProjectSlug(projectId)
   ]);
 
   if (!project) {
@@ -32,6 +33,7 @@ export default async function LprPage({
   const todayStats = stats[0] ?? null;
   const vehicles7d = stats.reduce((sum, stat) => sum + (stat.total_vehicles ?? 0), 0);
   const unknownVehicleCount = events.filter((event) => !event.plate_text || (event.plate_confidence ?? 0) < 0.8).length;
+  const reviewedEvents = events.filter((event) => event.review).length;
 
   return (
     <div className="space-y-8">
@@ -48,8 +50,8 @@ export default async function LprPage({
         <MetricCard label="Active cameras" value={`${cameras.filter((camera) => camera.active).length}`} hint="Registered LPR devices currently marked active" />
         <MetricCard label="Vehicles today" value={`${todayStats?.total_vehicles ?? 0}`} hint="Privacy-friendly daily traffic count" />
         <MetricCard label="Vehicles last 7 days" value={`${vehicles7d}`} hint="Aggregated count from retained daily stats" />
-        <MetricCard label="Recent captures" value={`${events.length}`} hint="Latest visible event rows in the portal" />
-        <MetricCard label="Needs review" value={`${unknownVehicleCount}`} hint="Fallback proxy for uncertain or incomplete recent recognition events" />
+        <MetricCard label="Known vehicles" value={`${knownVehicles.filter((vehicle) => vehicle.active).length}`} hint="Authorized, vendor, watchlist, and blocked registry entries" />
+        <MetricCard label="Reviewed / needs review" value={`${reviewedEvents} / ${Math.max(events.length - reviewedEvents, unknownVehicleCount)}`} hint="Workflow coverage for the current visible event set" />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -96,12 +98,12 @@ export default async function LprPage({
 
         <div className="space-y-6">
           <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-            <h2 className="text-xl font-semibold text-ink">Sprint 2 ingest readiness</h2>
-            <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-              <li>Authenticated ingest is now ready at <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/lpr/events/milesight</code>.</li>
-              <li>Each accepted event updates raw LPR events, camera last-seen telemetry, privacy-friendly daily stats, and an ingest audit log.</li>
-              <li>You can authenticate with either a per-camera <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">camera_key</code> in <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">lpr_cameras</code> or a temporary global <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">LPR_INGEST_SHARED_SECRET</code>.</li>
-            </ul>
+              <h2 className="text-xl font-semibold text-ink">Sprint 3 privacy and review controls</h2>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+              <li>Known vehicles can now be registered as authorized, vendor, watchlist, or blocked so event triage is no longer just raw plate review.</li>
+              <li>Owner and audit users can record per-event workflow decisions and link captures to known vehicles.</li>
+              <li>Raw plate visibility is now intended to stay limited to owner or audit users while others see masked but still useful summaries.</li>
+              </ul>
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p className="font-medium text-slate-900">Suggested camera POST fields</p>
               <p className="mt-2">

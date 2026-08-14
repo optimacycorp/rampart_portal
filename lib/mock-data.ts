@@ -6,6 +6,8 @@ import {
   LprCamera,
   LprDailyStat,
   LprEvent,
+  LprEventRecord,
+  LprKnownVehicle,
   MeetingTranscript,
   RoadClosureAlert,
   RoadConditionReport,
@@ -642,7 +644,25 @@ export const seededLprCameras: LprCamera[] = [
   }
 ];
 
-export const seededLprEvents: LprEvent[] = [
+export const seededLprKnownVehicles: LprKnownVehicle[] = [
+  {
+    id: "lpr-known-vehicle-1",
+    project_id: seededProject.id,
+    plate_text: "ABC1234",
+    label: "Thomas primary truck",
+    vehicle_kind: "pickup",
+    owner_name: "Thomas",
+    access_level: "authorized",
+    notes: "Seeded known vehicle example.",
+    active: true,
+    created_by_user_id: "demo-owner",
+    created_by_email: "team@rampart-range.org",
+    created_at: "2026-08-12T09:05:00-06:00",
+    updated_at: "2026-08-12T09:05:00-06:00"
+  }
+];
+
+const seededLprEventBase: LprEvent[] = [
   {
     id: "lpr-event-1",
     camera_id: "lpr-camera-1",
@@ -710,6 +730,26 @@ export const seededLprEvents: LprEvent[] = [
     created_at: "2026-08-12T18:20:02-06:00"
   }
 ];
+
+export const seededLprEvents: LprEventRecord[] = seededLprEventBase.map((event, index) => ({
+  ...event,
+  camera_name: seededLprCameras.find((camera) => camera.id === event.camera_id)?.name ?? null,
+  known_vehicle: seededLprKnownVehicles.find((vehicle) => vehicle.plate_text === event.plate_text) ?? null,
+  review:
+    index === 0
+      ? {
+          id: "lpr-review-1",
+          event_id: event.id,
+          review_status: "authorized",
+          matched_known_vehicle_id: "lpr-known-vehicle-1",
+          notes: "Matched to known owner vehicle.",
+          reviewed_by_user_id: "demo-owner",
+          reviewed_by_email: "team@rampart-range.org",
+          created_at: "2026-08-13T07:20:00-06:00",
+          updated_at: "2026-08-13T07:20:00-06:00"
+        }
+      : null
+}));
 
 export const seededLprDailyStats: LprDailyStat[] = [
   {

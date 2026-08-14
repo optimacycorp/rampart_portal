@@ -1,9 +1,9 @@
 import "server-only";
 
-import { seededLprCameras, seededLprDailyStats, seededLprEvents, seededProject } from "@/lib/mock-data";
+import { seededLprCameras, seededLprDailyStats, seededLprEvents, seededLprKnownVehicles, seededProject } from "@/lib/mock-data";
 import { getProjectBySlug } from "@/lib/documents";
 import { getSupabaseAdminClient } from "@/lib/supabase";
-import { LprCamera, LprDailyStat, LprEvent } from "@/lib/types";
+import { LprCamera, LprDailyStat, LprEventRecord, LprKnownVehicle } from "@/lib/types";
 
 export async function getLprCamerasByProjectSlug(projectSlug: string): Promise<LprCamera[]> {
   const supabase = getSupabaseAdminClient();
@@ -33,7 +33,33 @@ export async function getLprCamerasByProjectSlug(projectSlug: string): Promise<L
   return data as LprCamera[];
 }
 
-export async function getLprEventsByProjectSlug(projectSlug: string, limit = 25): Promise<LprEvent[]> {
+export async function getLprKnownVehiclesByProjectSlug(projectSlug: string): Promise<LprKnownVehicle[]> {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return projectSlug === seededProject.slug ? seededLprKnownVehicles : [];
+  }
+
+  const project = await getProjectBySlug(projectSlug);
+
+  if (!project) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("lpr_known_vehicles")
+    .select("id, project_id, plate_text, label, vehicle_kind, owner_name, access_level, notes, active, created_by_user_id, created_by_email, created_at, updated_at")
+    .eq("project_id", project.id)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data as LprKnownVehicle[];
+}
+
+export async function getLprEventsByProjectSlug(projectSlug: string, limit = 25): Promise<LprEventRecord[]> {
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
@@ -66,7 +92,44 @@ export async function getLprEventsByProjectSlug(projectSlug: string, limit = 25)
     return [];
   }
 
-  return data as LprEvent[];
+  const rows = data as LprEventRecord[];
+  const cameraMap = new Map(cameras.map((camera) => [camera.id, camera.id]));
+  const plateTexts = Array.from(new Set(rows.map((row) => row.plate_text).filter((value): value is string => Boolean(value))));
+  const eventIds = rows.map((row) => row.id);
+
+  const [knownVehicleData, reviewData, cameraData] = await Promise.all([
+    plateTexts.length
+      ? supabase
+          .from("lpr_known_vehicles")
+          .select("id, project_id, plate_text, label, vehicle_kind, owner_name, access_level, notes, active, created_by_user_id, created_by_email, created_at, updated_at")
+          .eq("project_id", project.id)
+          .in("plate_text", plateTexts)
+      : Promise.resolve({ data: [], error: null }),
+    eventIds.length
+      ? supabase
+          .from("lpr_event_reviews")
+          .select("id, event_id, review_status, matched_known_vehicle_id, notes, reviewed_by_user_id, reviewed_by_email, created_at, updated_at")
+          .in("event_id", eventIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("lpr_cameras").select("id, name").in("id", Array.from(cameraMap.keys()))
+  ]);
+
+  const knownVehicleMap = new Map(
+    (((knownVehicleData.data as LprKnownVehicle[] | null) ?? []).map((vehicle) => [vehicle.plate_text, vehicle]))
+  );
+  const reviewMap = new Map(
+    (((reviewData.data as LprEventRecord["review"][] | null) ?? []).filter(Boolean) as NonNullable<LprEventRecord["review"]>[]).map((review) => [review.event_id, review])
+  );
+  const cameraNameMap = new Map(
+    (((cameraData.data as Array<{ id: string; name: string }> | null) ?? []).map((camera) => [camera.id, camera.name]))
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    camera_name: cameraNameMap.get(row.camera_id) ?? null,
+    known_vehicle: row.plate_text ? knownVehicleMap.get(row.plate_text) ?? null : null,
+    review: reviewMap.get(row.id) ?? null
+  }));
 }
 
 export async function getLprDailyStatsByProjectSlug(projectSlug: string, limit = 14): Promise<LprDailyStat[]> {

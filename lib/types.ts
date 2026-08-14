@@ -324,6 +324,34 @@ export type LprCamera = {
   created_at?: string | null;
 };
 
+export type LprKnownVehicle = {
+  id: string;
+  project_id: string;
+  plate_text: string;
+  label: string;
+  vehicle_kind?: string | null;
+  owner_name?: string | null;
+  access_level: "authorized" | "vendor" | "watchlist" | "blocked";
+  notes?: string | null;
+  active?: boolean | null;
+  created_by_user_id?: string | null;
+  created_by_email?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type LprEventReview = {
+  id: string;
+  event_id: string;
+  review_status: "pending" | "authorized" | "vendor" | "watchlist" | "flagged" | "false_positive";
+  matched_known_vehicle_id?: string | null;
+  notes?: string | null;
+  reviewed_by_user_id?: string | null;
+  reviewed_by_email?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type LprEvent = {
   id: string;
   camera_id: string;
@@ -342,6 +370,12 @@ export type LprEvent = {
   event_longitude?: number | null;
   raw_payload?: Record<string, unknown> | null;
   created_at?: string | null;
+};
+
+export type LprEventRecord = LprEvent & {
+  camera_name?: string | null;
+  known_vehicle?: LprKnownVehicle | null;
+  review?: LprEventReview | null;
 };
 
 export type LprDailyStat = {
