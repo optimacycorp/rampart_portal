@@ -8,6 +8,7 @@ import {
   LprEvent,
   LprEventRecord,
   LprKnownVehicle,
+  LprPreservedEvent,
   MeetingTranscript,
   RoadClosureAlert,
   RoadConditionReport,
@@ -747,6 +748,22 @@ export const seededLprEvents: LprEventRecord[] = seededLprEventBase.map((event, 
           reviewed_by_email: "team@rampart-range.org",
           created_at: "2026-08-13T07:20:00-06:00",
           updated_at: "2026-08-13T07:20:00-06:00"
+        }
+      : null,
+  preserved:
+    index === 0
+      ? {
+          id: "lpr-preserved-1",
+          event_id: event.id,
+          case_reference: "RAMPART-LPR-2026-001",
+          preservation_reason: "Owner vehicle verification baseline",
+          preserve_until: "2026-12-31",
+          notes: "Seeded example of an event preserved for internal evidence continuity.",
+          released_at: null,
+          preserved_by_user_id: "demo-owner",
+          preserved_by_email: "team@rampart-range.org",
+          created_at: "2026-08-13T07:22:00-06:00",
+          updated_at: "2026-08-13T07:22:00-06:00"
         }
       : null
 }));

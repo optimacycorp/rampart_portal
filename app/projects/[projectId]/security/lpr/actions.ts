@@ -125,3 +125,86 @@ export async function reviewLprEvent(projectSlug: string, eventId: string, formD
   revalidatePath(`/projects/${projectSlug}/security/lpr/events`);
   redirect(`/projects/${projectSlug}/security/lpr/events?status=review-saved`);
 }
+
+export async function preserveLprEvent(projectSlug: string, eventId: string, formData: FormData) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=supabase-not-configured`);
+  }
+
+  let user;
+  try {
+    user = await requireLprManagementRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=forbidden`);
+  }
+
+  const event = (await getLprEventsByProjectSlug(projectSlug, 500)).find((item) => item.id === eventId);
+
+  if (!event) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=lpr-event-not-found`);
+  }
+
+  const preservationReason = readValue(formData, "preservation_reason");
+
+  if (!preservationReason) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=preservation-reason-required`);
+  }
+
+  const { error } = await supabase.from("lpr_preserved_events").upsert(
+    {
+      event_id: eventId,
+      case_reference: readValue(formData, "case_reference") || null,
+      preservation_reason: preservationReason,
+      preserve_until: readValue(formData, "preserve_until") || null,
+      notes: readValue(formData, "preservation_notes") || null,
+      released_at: null,
+      preserved_by_user_id: user.id,
+      preserved_by_email: user.email ?? null,
+      updated_at: new Date().toISOString()
+    },
+    {
+      onConflict: "event_id",
+      ignoreDuplicates: false
+    }
+  );
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=lpr-preserve-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/security/lpr`);
+  revalidatePath(`/projects/${projectSlug}/security/lpr/events`);
+  redirect(`/projects/${projectSlug}/security/lpr/events?status=preserved`);
+}
+
+export async function releasePreservedLprEvent(projectSlug: string, eventId: string) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=supabase-not-configured`);
+  }
+
+  try {
+    await requireLprManagementRole();
+  } catch {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=forbidden`);
+  }
+
+  const { error } = await supabase
+    .from("lpr_preserved_events")
+    .update({
+      released_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("event_id", eventId);
+
+  if (error) {
+    redirect(`/projects/${projectSlug}/security/lpr/events?error=lpr-release-failed`);
+  }
+
+  revalidatePath(`/projects/${projectSlug}/security/lpr`);
+  revalidatePath(`/projects/${projectSlug}/security/lpr/events`);
+  redirect(`/projects/${projectSlug}/security/lpr/events?status=released`);
+}

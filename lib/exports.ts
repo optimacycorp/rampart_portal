@@ -4,6 +4,7 @@ import { getProjectBySlug, getDocumentsByProjectSlug } from "@/lib/documents";
 import { getEvidencePhotosByProjectSlug } from "@/lib/evidence-photos";
 import { getFieldPointsByProjectSlug } from "@/lib/field-points";
 import { FULL_DISCLAIMER } from "@/lib/constants";
+import { getLprEventsByProjectSlug } from "@/lib/lpr";
 import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
 import { getProjectTasksByProjectSlug } from "@/lib/project-tasks";
 import { getReviewerCommentsByProjectSlug } from "@/lib/reviewer-comments";
@@ -221,5 +222,59 @@ export async function buildFieldEvidenceSummaryMarkdown(projectSlug: string) {
     filename: `${project.slug}-field-evidence-summary.md`,
     contentType: "text/markdown; charset=utf-8",
     content: lines.join("\n")
+  };
+}
+
+export async function buildLprEvidenceCsv(projectSlug: string) {
+  const [project, events] = await Promise.all([
+    getProjectBySlug(projectSlug),
+    getLprEventsByProjectSlug(projectSlug, { limit: 250, reviewStatus: "all" })
+  ]);
+
+  if (!project) {
+    return null;
+  }
+
+  const header = [
+    "Observed At",
+    "Camera",
+    "Plate",
+    "Plate Confidence",
+    "Direction",
+    "Vehicle",
+    "Known Vehicle Label",
+    "Known Vehicle Access Level",
+    "Review Status",
+    "Review Notes",
+    "Preserved",
+    "Case Reference",
+    "Preservation Reason",
+    "Preserve Until"
+  ];
+
+  const rows = events.map((event) => [
+    event.observed_at,
+    event.camera_name ?? event.camera_id,
+    event.plate_text ?? "",
+    event.plate_confidence ?? "",
+    event.direction ?? "",
+    [event.vehicle_make, event.vehicle_model, event.vehicle_color, event.vehicle_type].filter(Boolean).join(" "),
+    event.known_vehicle?.label ?? "",
+    event.known_vehicle?.access_level ?? "",
+    event.review?.review_status ?? "pending",
+    event.review?.notes ?? "",
+    event.preserved && !event.preserved.released_at ? "yes" : "no",
+    event.preserved?.case_reference ?? "",
+    event.preserved?.preservation_reason ?? "",
+    event.preserved?.preserve_until ?? ""
+  ]);
+
+  const csv = [header, ...rows].map((row) => row.map(escapeCsvValue).join(",")).join("\n");
+
+  return {
+    filename: `${project.slug}-lpr-evidence.csv`,
+    contentType: "text/csv; charset=utf-8",
+    content: csv,
+    rowCount: rows.length
   };
 }

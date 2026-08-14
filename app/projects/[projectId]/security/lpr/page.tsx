@@ -34,6 +34,7 @@ export default async function LprPage({
   const vehicles7d = stats.reduce((sum, stat) => sum + (stat.total_vehicles ?? 0), 0);
   const unknownVehicleCount = events.filter((event) => !event.plate_text || (event.plate_confidence ?? 0) < 0.8).length;
   const reviewedEvents = events.filter((event) => event.review).length;
+  const preservedEvents = events.filter((event) => event.preserved && !event.preserved.released_at).length;
 
   return (
     <div className="space-y-8">
@@ -51,6 +52,7 @@ export default async function LprPage({
         <MetricCard label="Vehicles today" value={`${todayStats?.total_vehicles ?? 0}`} hint="Privacy-friendly daily traffic count" />
         <MetricCard label="Vehicles last 7 days" value={`${vehicles7d}`} hint="Aggregated count from retained daily stats" />
         <MetricCard label="Known vehicles" value={`${knownVehicles.filter((vehicle) => vehicle.active).length}`} hint="Authorized, vendor, watchlist, and blocked registry entries" />
+        <MetricCard label="Preserved events" value={`${preservedEvents}`} hint="Currently retained as explicit evidence records" />
         <MetricCard label="Reviewed / needs review" value={`${reviewedEvents} / ${Math.max(events.length - reviewedEvents, unknownVehicleCount)}`} hint="Workflow coverage for the current visible event set" />
       </section>
 
@@ -103,7 +105,8 @@ export default async function LprPage({
               <li>Known vehicles can now be registered as authorized, vendor, watchlist, or blocked so event triage is no longer just raw plate review.</li>
               <li>Owner and audit users can record per-event workflow decisions and link captures to known vehicles.</li>
               <li>Raw plate visibility is now intended to stay limited to owner or audit users while others see masked but still useful summaries.</li>
-              </ul>
+              <li>Preserved events and controlled exports complete the first retention-ready evidence workflow for site vehicle activity.</li>
+            </ul>
             <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p className="font-medium text-slate-900">Suggested camera POST fields</p>
               <p className="mt-2">
@@ -120,6 +123,9 @@ export default async function LprPage({
               </Link>
               <Link href={`/projects/${projectId}/security/lpr/stats`} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
                 Open daily traffic stats
+              </Link>
+              <Link href={`/projects/${projectId}/exports`} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+                Open controlled exports
               </Link>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/PageHeader";
 import { getCurrentUserContext } from "@/lib/auth-server";
-import { createKnownVehicle, reviewLprEvent } from "../actions";
+import { createKnownVehicle, preserveLprEvent, releasePreservedLprEvent, reviewLprEvent } from "../actions";
 import { getProjectBySlug } from "@/lib/documents";
 import { getLprEventsByProjectSlug, getLprKnownVehiclesByProjectSlug } from "@/lib/lpr";
 
@@ -37,15 +37,22 @@ function badgeClasses(value: string) {
 }
 
 export default async function LprEventsPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ projectId: string }>;
+  searchParams?: Promise<{ q?: string; review?: string; preserved?: string }>;
 }) {
   const { projectId } = await params;
+  const filters = (await searchParams) ?? {};
+  const search = `${filters.q ?? ""}`.trim();
+  const review = `${filters.review ?? "all"}`.trim() || "all";
+  const preservedOnly = `${filters.preserved ?? ""}` === "1";
+
   const [{ role }, project, events, knownVehicles] = await Promise.all([
     getCurrentUserContext(),
     getProjectBySlug(projectId),
-    getLprEventsByProjectSlug(projectId, 50),
+    getLprEventsByProjectSlug(projectId, { limit: 50, search, reviewStatus: review, preservedOnly }),
     getLprKnownVehiclesByProjectSlug(projectId)
   ]);
 
@@ -71,6 +78,42 @@ export default async function LprEventsPage({
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <strong>Retention note:</strong> Use identifiable plate events conservatively. Raw plates are masked here unless you are an owner or audit user, and long-term retention should remain narrow and intentional.
       </div>
+
+      <form className="grid gap-4 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-card md:grid-cols-[1.4fr_0.9fr_0.8fr_0.6fr_0.6fr]">
+        <label className="block text-sm text-slate-700">
+          <span className="mb-2 block font-medium">Search</span>
+          <input name="q" defaultValue={search} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3" placeholder="Plate, camera, label, make, case reference" />
+        </label>
+        <label className="block text-sm text-slate-700">
+          <span className="mb-2 block font-medium">Review status</span>
+          <select name="review" defaultValue={review} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="authorized">Authorized</option>
+            <option value="vendor">Vendor</option>
+            <option value="watchlist">Watchlist</option>
+            <option value="flagged">Flagged</option>
+            <option value="false_positive">False positive</option>
+          </select>
+        </label>
+        <label className="block text-sm text-slate-700">
+          <span className="mb-2 block font-medium">Preserved only</span>
+          <select name="preserved" defaultValue={preservedOnly ? "1" : "0"} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3">
+            <option value="0">All events</option>
+            <option value="1">Preserved only</option>
+          </select>
+        </label>
+        <div className="flex items-end">
+          <button type="submit" className="w-full rounded-full bg-pine px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90">
+            Apply
+          </button>
+        </div>
+        <div className="flex items-end">
+          <a href={`/projects/${projectId}/security/lpr/events`} className="w-full rounded-full bg-slate-100 px-4 py-3 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
+            Clear
+          </a>
+        </div>
+      </form>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-card">
@@ -170,10 +213,12 @@ export default async function LprEventsPage({
         </div>
         <div className="divide-y divide-slate-100">
           {events.length === 0 ? (
-            <div className="px-5 py-8 text-sm text-slate-600">No LPR events are stored yet.</div>
+            <div className="px-5 py-8 text-sm text-slate-600">No LPR events match the current filters.</div>
           ) : (
             events.map((event) => {
               const reviewAction = reviewLprEvent.bind(null, projectId, event.id);
+              const preserveAction = preserveLprEvent.bind(null, projectId, event.id);
+              const releaseAction = releasePreservedLprEvent.bind(null, projectId, event.id);
               const displayPlate = canViewRawPlates ? event.plate_text ?? "Unread / hidden" : maskPlate(event.plate_text);
               const reviewStatus = event.review?.review_status ?? "pending";
 
@@ -190,42 +235,91 @@ export default async function LprEventsPage({
                       {event.known_vehicle?.access_level ?? reviewStatus}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">{event.known_vehicle?.label ?? "No registry match"}</span>
+                    {event.preserved && !event.preserved.released_at ? (
+                      <span className="mt-1 block text-xs font-medium text-amber-700">
+                        Preserved{event.preserved.case_reference ? ` - ${event.preserved.case_reference}` : ""}
+                      </span>
+                    ) : null}
                   </span>
                   <span>{event.direction ?? "Unknown"}</span>
                   <span>{[event.vehicle_make, event.vehicle_model, event.vehicle_color, event.vehicle_type].filter(Boolean).join(" ") || "Unknown vehicle"}</span>
                   <span>
                     {canManage ? (
-                      <form action={reviewAction} className="space-y-2">
-                        <select name="review_status" defaultValue={reviewStatus} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs">
-                          <option value="pending">Pending</option>
-                          <option value="authorized">Authorized</option>
-                          <option value="vendor">Vendor</option>
-                          <option value="watchlist">Watchlist</option>
-                          <option value="flagged">Flagged</option>
-                          <option value="false_positive">False positive</option>
-                        </select>
-                        <select name="matched_known_vehicle_id" defaultValue={event.review?.matched_known_vehicle_id ?? event.known_vehicle?.id ?? ""} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs">
-                          <option value="">No linked vehicle</option>
-                          {knownVehicles.map((vehicle) => (
-                            <option key={vehicle.id} value={vehicle.id}>
-                              {vehicle.label}
-                            </option>
-                          ))}
-                        </select>
-                        <textarea
-                          name="notes"
-                          rows={2}
-                          defaultValue={event.review?.notes ?? ""}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
-                          placeholder="Review notes"
-                        />
-                        <button type="submit" className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90">
-                          Save review
-                        </button>
-                      </form>
+                      <div className="space-y-3">
+                        <form action={reviewAction} className="space-y-2">
+                          <select name="review_status" defaultValue={reviewStatus} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs">
+                            <option value="pending">Pending</option>
+                            <option value="authorized">Authorized</option>
+                            <option value="vendor">Vendor</option>
+                            <option value="watchlist">Watchlist</option>
+                            <option value="flagged">Flagged</option>
+                            <option value="false_positive">False positive</option>
+                          </select>
+                          <select name="matched_known_vehicle_id" defaultValue={event.review?.matched_known_vehicle_id ?? event.known_vehicle?.id ?? ""} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs">
+                            <option value="">No linked vehicle</option>
+                            {knownVehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.label}
+                              </option>
+                            ))}
+                          </select>
+                          <textarea
+                            name="notes"
+                            rows={2}
+                            defaultValue={event.review?.notes ?? ""}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                            placeholder="Review notes"
+                          />
+                          <button type="submit" className="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90">
+                            Save review
+                          </button>
+                        </form>
+                        <form action={preserveAction} className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                          <input
+                            name="case_reference"
+                            defaultValue={event.preserved?.case_reference ?? ""}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                            placeholder="Case reference"
+                          />
+                          <input
+                            name="preservation_reason"
+                            defaultValue={event.preserved?.preservation_reason ?? ""}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                            placeholder="Preservation reason"
+                            required
+                          />
+                          <input
+                            type="date"
+                            name="preserve_until"
+                            defaultValue={event.preserved?.preserve_until ?? ""}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                          />
+                          <textarea
+                            name="preservation_notes"
+                            rows={2}
+                            defaultValue={event.preserved?.notes ?? ""}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                            placeholder="Retention / evidence notes"
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button type="submit" className="rounded-full bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90">
+                              {event.preserved && !event.preserved.released_at ? "Update preserve" : "Preserve"}
+                            </button>
+                            {event.preserved && !event.preserved.released_at ? (
+                              <button formAction={releaseAction} type="submit" className="rounded-full bg-slate-200 px-3 py-2 text-xs font-semibold text-slate-800 transition hover:bg-slate-300">
+                                Release
+                              </button>
+                            ) : null}
+                          </div>
+                        </form>
+                      </div>
                     ) : (
                       <div className="text-xs text-slate-500">
-                        {event.review?.notes ? `${event.review.review_status}: ${event.review.notes}` : "Review controls limited to owner or audit users."}
+                        {event.preserved && !event.preserved.released_at
+                          ? `Preserved${event.preserved.case_reference ? ` (${event.preserved.case_reference})` : ""}.`
+                          : event.review?.notes
+                            ? `${event.review.review_status}: ${event.review.notes}`
+                            : "Review controls limited to owner or audit users."}
                       </div>
                     )}
                   </span>

@@ -352,6 +352,20 @@ export type LprEventReview = {
   updated_at?: string | null;
 };
 
+export type LprPreservedEvent = {
+  id: string;
+  event_id: string;
+  case_reference?: string | null;
+  preservation_reason: string;
+  preserve_until?: string | null;
+  notes?: string | null;
+  released_at?: string | null;
+  preserved_by_user_id?: string | null;
+  preserved_by_email?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type LprEvent = {
   id: string;
   camera_id: string;
@@ -376,6 +390,7 @@ export type LprEventRecord = LprEvent & {
   camera_name?: string | null;
   known_vehicle?: LprKnownVehicle | null;
   review?: LprEventReview | null;
+  preserved?: LprPreservedEvent | null;
 };
 
 export type LprDailyStat = {

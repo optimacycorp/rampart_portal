@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { PageHeader } from "@/components/PageHeader";
+import { getCurrentUserContext } from "@/lib/auth-server";
 import { getAccessLogsByProjectSlug } from "@/lib/access-log";
 import { getCulvertsByProjectId } from "@/lib/culverts";
 import { getDocumentsByProjectSlug, getProjectBySlug } from "@/lib/documents";
 import { getEvidencePhotosByProjectSlug } from "@/lib/evidence-photos";
 import { getFieldPointsByProjectSlug } from "@/lib/field-points";
+import { getLprEventsByProjectSlug } from "@/lib/lpr";
 import { getMeetingTranscriptsByProjectSlug } from "@/lib/meeting-transcripts";
 import { getProjectTasksByProjectSlug } from "@/lib/project-tasks";
 import { getReviewerCommentsByProjectSlug } from "@/lib/reviewer-comments";
@@ -25,6 +27,11 @@ const exportCards = [
     kind: "field-evidence-summary",
     title: "Field Evidence Summary",
     description: "Markdown summary of field points, culverts, access logs, photo evidence, transcripts, and open tasks."
+  },
+  {
+    kind: "lpr-evidence",
+    title: "LPR Evidence CSV",
+    description: "Controlled export of reviewed and preserved LPR evidence records. Limited to owner and audit users."
   }
 ] as const;
 
@@ -34,7 +41,8 @@ export default async function ExportsPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
-  const [project, documents, comments, fieldPoints, accessLogs, photos, tasks, transcripts] = await Promise.all([
+  const [{ role }, project, documents, comments, fieldPoints, accessLogs, photos, tasks, transcripts, lprEvents] = await Promise.all([
+    getCurrentUserContext(),
     getProjectBySlug(projectId),
     getDocumentsByProjectSlug(projectId),
     getReviewerCommentsByProjectSlug(projectId),
@@ -42,7 +50,8 @@ export default async function ExportsPage({
     getAccessLogsByProjectSlug(projectId),
     getEvidencePhotosByProjectSlug(projectId),
     getProjectTasksByProjectSlug(projectId),
-    getMeetingTranscriptsByProjectSlug(projectId)
+    getMeetingTranscriptsByProjectSlug(projectId),
+    getLprEventsByProjectSlug(projectId, { limit: 250, reviewStatus: "all" })
   ]);
 
   if (!project) {
@@ -60,6 +69,8 @@ export default async function ExportsPage({
   const culverts = await getCulvertsByProjectId(project.id);
   const openComments = comments.filter((comment) => comment.status !== "resolved");
   const openTasks = tasks.filter((task) => task.status !== "resolved" && task.status !== "closed");
+  const canExportLpr = role === "owner" || role === "audit";
+  const preservedLprEvents = lprEvents.filter((event) => event.preserved && !event.preserved.released_at).length;
 
   return (
     <div className="space-y-8">
@@ -90,19 +101,30 @@ export default async function ExportsPage({
           <p className="mt-3 text-3xl font-semibold text-ink">{accessLogs.length + transcripts.length + openTasks.length}</p>
           <p className="mt-2 text-sm text-slate-600">Access logs, transcripts, and active tasks in summary exports.</p>
         </div>
+        <div className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-card">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">LPR Preserved</p>
+          <p className="mt-3 text-3xl font-semibold text-ink">{preservedLprEvents}</p>
+          <p className="mt-2 text-sm text-slate-600">Events currently retained as explicit evidence.</p>
+        </div>
       </section>
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         {exportCards.map((card) => (
           <article key={card.kind} className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-pine">Download export</p>
             <h2 className="mt-3 text-xl font-semibold text-ink">{card.title}</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">{card.description}</p>
-            <Link
-              href={`/api/exports/${card.kind}?projectId=${project.slug}`}
-              className="mt-6 inline-flex rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white"
-            >
-              Download
-            </Link>
+            {card.kind === "lpr-evidence" && !canExportLpr ? (
+              <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                Only owner or audit users can export raw LPR evidence.
+              </div>
+            ) : (
+              <Link
+                href={`/api/exports/${card.kind}?projectId=${project.slug}`}
+                className="mt-6 inline-flex rounded-full bg-pine px-4 py-2 text-sm font-semibold text-white"
+              >
+                Download
+              </Link>
+            )}
           </article>
         ))}
       </section>
@@ -123,6 +145,7 @@ export default async function ExportsPage({
             <p>{openComments.length} open reviewer comments ready for matrix export.</p>
             <p>{fieldPoints.length} field points, {culverts.length} culverts, and {photos.length} photo records in the field summary.</p>
             <p>{accessLogs.length} access logs, {transcripts.length} meeting transcripts, and {openTasks.length} active tasks included in the coordination summary.</p>
+            <p>{preservedLprEvents} preserved LPR events currently eligible for controlled evidence export.</p>
           </div>
         </div>
       </section>
