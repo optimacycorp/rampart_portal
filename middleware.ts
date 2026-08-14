@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const publicPaths = ["/login"];
-  const publicApiPrefixes = ["/api/address/"];
+  const publicApiPrefixes = ["/api/address/", "/api/lpr/"];
 
   if (publicApiPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return response;

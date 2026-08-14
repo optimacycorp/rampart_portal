@@ -96,12 +96,18 @@ export default async function LprPage({
 
         <div className="space-y-6">
           <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
-            <h2 className="text-xl font-semibold text-ink">Sprint 1 delivered</h2>
+            <h2 className="text-xl font-semibold text-ink">Sprint 2 ingest readiness</h2>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-              <li>LPR foundation schema is now in place for cameras, raw events, and privacy-friendly daily stats.</li>
-              <li>The portal now has a dedicated Security / LPR workspace instead of burying vehicle activity inside general evidence records.</li>
-              <li>Future sprints can now add Milesight ingest, retention controls, known vehicles, audit logging, and evidence preservation without reshaping the foundation.</li>
+              <li>Authenticated ingest is now ready at <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">/api/lpr/events/milesight</code>.</li>
+              <li>Each accepted event updates raw LPR events, camera last-seen telemetry, privacy-friendly daily stats, and an ingest audit log.</li>
+              <li>You can authenticate with either a per-camera <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">camera_key</code> in <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">lpr_cameras</code> or a temporary global <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">LPR_INGEST_SHARED_SECRET</code>.</li>
             </ul>
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">Suggested camera POST fields</p>
+              <p className="mt-2">
+                <code className="rounded bg-white px-1 py-0.5 text-xs">camera_name</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">camera_id</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">observed_at</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">plate_text</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">confidence</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">direction</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">image_url</code>, <code className="rounded bg-white px-1 py-0.5 text-xs">latitude</code>, and <code className="rounded bg-white px-1 py-0.5 text-xs">longitude</code>.
+              </p>
+            </div>
           </div>
 
           <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
