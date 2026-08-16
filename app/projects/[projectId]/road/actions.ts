@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUserContext } from "@/lib/auth-server";
+import { fetchCotrexDatasetStatus } from "@/lib/cotrex";
 import { getProjectBySlug } from "@/lib/documents";
 import { getRecentRoadDailySnapshots } from "@/lib/road-history";
 import { fetchNwsForPoint } from "@/lib/nws";
@@ -328,6 +329,7 @@ export async function refreshRoadStatusSources(projectSlug: string) {
 
   const rrmmcSource = overview.sources.find((source) => source.provider_key === "rrmmc");
   const usfsSource = overview.sources.find((source) => source.provider_key === "usfs_psicc");
+  const cotrexSource = overview.sources.find((source) => source.provider_key === "cotrex");
 
   if (!rrmmcSource || !usfsSource) {
     redirect(`/projects/${projectSlug}/road?error=status-source-not-found`);
@@ -358,6 +360,22 @@ export async function refreshRoadStatusSources(projectSlug: string) {
     })
     .select("id")
     .single();
+
+  const cotrexRun =
+    cotrexSource && cotrexSource.enabled !== false
+      ? await supabase
+          .from("road_ingestion_runs")
+          .insert({
+            source_id: cotrexSource.id,
+            job_name: "manual-cotrex-refresh",
+            started_at: new Date().toISOString(),
+            status: "running",
+            parser_version: "cotrex-manual-v1",
+            metadata: { corridor_id: overview.corridor.id }
+          })
+          .select("id")
+          .single()
+      : null;
 
   if (!rrmmcRun || !usfsRun) {
     redirect(`/projects/${projectSlug}/road?error=refresh-start-failed`);
@@ -545,6 +563,69 @@ export async function refreshRoadStatusSources(projectSlug: string) {
 
   if (!rrmmcSucceeded && !usfsSucceeded) {
     redirect(`/projects/${projectSlug}/road?error=status-refresh-failed`);
+  }
+
+  if (cotrexSource && cotrexSource.enabled !== false && cotrexRun?.data?.id) {
+    try {
+      const cotrex = await fetchCotrexDatasetStatus();
+
+      await supabase.from("road_status_observations").insert({
+        corridor_id: overview.corridor.id,
+        source_id: cotrexSource.id,
+        observed_at: new Date().toISOString(),
+        fetched_at: new Date().toISOString(),
+        status: "unknown",
+        gate_status: "unknown",
+        summary: cotrex.summary,
+        raw_status_text: cotrex.rawStatusText,
+        source_url: cotrex.sourceUrl,
+        confidence: 0.3,
+        official: false,
+        raw_payload: cotrex.rawPayload
+      });
+
+      await supabase
+        .from("road_data_sources")
+        .update({
+          last_attempt_at: new Date().toISOString(),
+          last_success_at: new Date().toISOString(),
+          parser_version: "cotrex-manual-v1",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", cotrexSource.id);
+
+      await supabase
+        .from("road_ingestion_runs")
+        .update({
+          completed_at: new Date().toISOString(),
+          status: "success",
+          records_received: 1,
+          records_inserted: 1,
+          records_updated: 0,
+          http_status: 200,
+          metadata: {
+            dataset_status: "reachable"
+          }
+        })
+        .eq("id", cotrexRun.data.id);
+    } catch (error) {
+      await supabase
+        .from("road_ingestion_runs")
+        .update({
+          completed_at: new Date().toISOString(),
+          status: "failed",
+          error_message: error instanceof Error ? error.message : "Unexpected COTREX refresh failure."
+        })
+        .eq("id", cotrexRun.data.id);
+
+      await supabase
+        .from("road_data_sources")
+        .update({
+          last_attempt_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", cotrexSource.id);
+    }
   }
 
   revalidatePath(`/projects/${projectSlug}/road`);

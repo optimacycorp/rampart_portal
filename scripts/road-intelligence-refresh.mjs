@@ -10,6 +10,8 @@ const RRMMC_STATUS_URLS = [
   "https://rampartrange.org/trail-info/",
   "https://rampartrange.org/events/"
 ];
+const COTREX_DATASET_PAGE_URL = "https://data.colorado.gov/Recreation/Colorado-Trail-Explorer-COTREX-/tsn8-y22x";
+const COTREX_DATASET_METADATA_URL = "https://data.colorado.gov/api/views/tsn8-y22x.json";
 const USFS_FIRE_RESTRICTIONS_URL = "https://www.fs.usda.gov/r02/psicc/fire/fire-restrictions";
 const USFS_RAMPART_RECREATION_URL = "https://www.fs.usda.gov/r02/psicc/recreation/trails/rampart-reservoir-trail-700";
 
@@ -70,6 +72,13 @@ function readIntEnv(name, fallback) {
 
 function readJsonObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function getConfiguredRrmmcStatusUrls() {
+  const configured = normalizeString(process.env.ROAD_RRMMC_STATUS_URLS);
+  if (!configured) return RRMMC_STATUS_URLS;
+  const urls = configured.split(",").map((value) => value.trim()).filter(Boolean);
+  return urls.length ? urls : RRMMC_STATUS_URLS;
 }
 
 function toIsoNow() {
@@ -327,7 +336,7 @@ async function fetchRrmmcRoadStatus() {
   };
   const errors = [];
 
-  for (const url of RRMMC_STATUS_URLS) {
+  for (const url of getConfiguredRrmmcStatusUrls()) {
     try {
       const html = await fetchText(url, headers);
       const text = stripHtmlTags(html);
@@ -356,7 +365,68 @@ async function fetchRrmmcRoadStatus() {
     }
   }
 
+  const manualRoadStatus = normalizeString(process.env.ROAD_RRMMC_MANUAL_ROAD_STATUS);
+  if (manualRoadStatus) {
+    const manualTrailStatus = normalizeString(process.env.ROAD_RRMMC_MANUAL_TRAIL_STATUS) || null;
+    const manualSourceUrl = normalizeString(process.env.ROAD_RRMMC_MANUAL_SOURCE_URL) || "manual://rrmmc";
+    const manualNote =
+      normalizeString(process.env.ROAD_RRMMC_MANUAL_NOTE) ||
+      "Manual RRMMC fallback configured because the server could not reach the live RRMMC site.";
+
+    return {
+      trailStatus: manualTrailStatus,
+      roadStatus: manualRoadStatus,
+      summary: `RRMMC fallback status in use. Trail Status: ${manualTrailStatus ?? "unknown"}. Rampart Range Road Status: ${manualRoadStatus}. ${manualNote}`,
+      sourceUrl: manualSourceUrl,
+      rawStatusText: manualRoadStatus,
+      rawPayload: {
+        mode: "manual_fallback",
+        trail_status: manualTrailStatus,
+        road_status: manualRoadStatus,
+        note: manualNote,
+        fetch_errors: errors
+      }
+    };
+  }
+
   throw new Error(`RRMMC status fetch failed. ${errors.join(" | ")}`);
+}
+
+async function fetchCotrexDatasetStatus() {
+  const response = await fetch(COTREX_DATASET_METADATA_URL, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": process.env.ROAD_STATUS_USER_AGENT || process.env.NWS_USER_AGENT || DEFAULT_NWS_USER_AGENT
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(readIntEnv("ROAD_INTEL_FETCH_TIMEOUT_MS", 20000))
+  });
+
+  if (!response.ok) {
+    throw new Error(`COTREX metadata request failed (${response.status}) for ${COTREX_DATASET_METADATA_URL}`);
+  }
+
+  const metadata = await response.json();
+  const updatedAt =
+    metadata?.rowsUpdatedAt && Number.isFinite(metadata.rowsUpdatedAt)
+      ? new Date(metadata.rowsUpdatedAt * 1000).toISOString()
+      : normalizeString(metadata?.metadata_updated_at) || null;
+  const datasetTitle = normalizeString(metadata?.name) || "Colorado Trail Explorer (COTREX)";
+
+  return {
+    summary: updatedAt
+      ? `${datasetTitle} public dataset is reachable. Metadata indicates it was updated ${updatedAt}.`
+      : `${datasetTitle} public dataset is reachable through the Colorado Information Marketplace.`,
+    sourceUrl: COTREX_DATASET_PAGE_URL,
+    rawStatusText: updatedAt ? `Dataset reachable; updated ${updatedAt}` : "Dataset reachable",
+    rawPayload: {
+      dataset_page_url: COTREX_DATASET_PAGE_URL,
+      metadata_url: COTREX_DATASET_METADATA_URL,
+      dataset_name: metadata?.name ?? null,
+      rows_updated_at: metadata?.rowsUpdatedAt ?? null,
+      metadata_updated_at: metadata?.metadata_updated_at ?? null
+    }
+  };
 }
 
 function inferAlertType(title) {
@@ -551,7 +621,7 @@ async function getProjectAndOverview(supabase, projectSlug) {
   const { data: sources, error: sourcesError } = await supabase
     .from("road_data_sources")
     .select("id, provider_key, provider_name, authority_level, parser_version")
-    .in("provider_key", ["nws", "rrmmc", "usfs_psicc", "portal_system"]);
+    .in("provider_key", ["nws", "rrmmc", "usfs_psicc", "portal_system", "cotrex"]);
 
   if (sourcesError || !sources) {
     throw new Error("Road data sources could not be loaded.");
@@ -815,6 +885,7 @@ async function refreshRoadWeather(supabase, overview) {
 async function refreshRoadStatusSources(supabase, overview) {
   const rrmmcSource = overview.sources.find((source) => source.provider_key === "rrmmc");
   const usfsSource = overview.sources.find((source) => source.provider_key === "usfs_psicc");
+  const cotrexSource = overview.sources.find((source) => source.provider_key === "cotrex");
 
   if (!rrmmcSource || !usfsSource) {
     throw new Error("USFS or RRMMC source record is missing.");
@@ -828,12 +899,59 @@ async function refreshRoadStatusSources(supabase, overview) {
   });
 
   const result = {
+    cotrexStatus: cotrexSource?.enabled === false ? "disabled" : null,
+    cotrexError: null,
     rrmmcStatus: null,
     rrmmcError: null,
     usfsStatus: null,
     usfsAlertCount: 0,
     usfsError: null
   };
+
+  if (cotrexSource && cotrexSource.enabled !== false) {
+    const cotrexRunId = await createRun(supabase, cotrexSource.id, "cron-cotrex-refresh", "cotrex-cron-v1", {
+      corridor_id: overview.corridor.id
+    });
+
+    await fetchCotrexDatasetStatus()
+      .then(async (cotrex) => {
+        const observationInsert = await supabase.from("road_status_observations").insert({
+          corridor_id: overview.corridor.id,
+          source_id: cotrexSource.id,
+          observed_at: toIsoNow(),
+          fetched_at: toIsoNow(),
+          status: "unknown",
+          gate_status: "unknown",
+          summary: cotrex.summary,
+          raw_status_text: cotrex.rawStatusText,
+          source_url: cotrex.sourceUrl,
+          confidence: 0.3,
+          official: false,
+          raw_payload: cotrex.rawPayload
+        });
+
+        if (observationInsert.error) throw observationInsert.error;
+
+        await updateSourceSuccess(supabase, cotrexSource.id, "cotrex-cron-v1");
+        await markRunSuccess(supabase, cotrexRunId, {
+          records_received: 1,
+          records_inserted: 1,
+          records_updated: 0,
+          http_status: 200,
+          metadata: {
+            dataset_status: "reachable"
+          }
+        });
+
+        result.cotrexStatus = "reachable";
+      })
+      .catch(async (error) => {
+        const message = error instanceof Error ? error.message : "Unexpected COTREX refresh failure.";
+        result.cotrexError = message;
+        await updateSourceAttempt(supabase, cotrexSource.id);
+        await markRunFailure(supabase, cotrexRunId, message);
+      });
+  }
 
   const rrmmcOutcome = await fetchRrmmcRoadStatus()
     .then(async (rrmmc) => {

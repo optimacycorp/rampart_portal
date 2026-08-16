@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProjectAssistant } from "@/components/ProjectAssistant";
 import { RoadConditionReportForm } from "@/components/RoadConditionReportForm";
 import { RoadFieldMeasurementForm } from "@/components/RoadFieldMeasurementForm";
+import { TemperatureTrendChart } from "@/components/TemperatureTrendChart";
 import { getCurrentUserContext } from "@/lib/auth-server";
 import { ROAD_INTELLIGENCE_DISCLAIMER, ROAD_RISK_LABELS, ROAD_STATUS_LABELS } from "@/lib/constants";
 import { getCulvertsByProjectId } from "@/lib/culverts";
@@ -23,6 +24,7 @@ import { getRecentRoadDailySnapshots, getRoadSourceHealth } from "@/lib/road-his
 import { getRoadFieldMeasurementsByCorridorId, getRoadMeasurementStats } from "@/lib/road-measurements";
 import { getRecentRoadStatusEvents } from "@/lib/road-reconciliation";
 import { getRoadConditionReportsByCorridorId } from "@/lib/road-reports";
+import { getRoadTemperatureSeries, TemperatureRange } from "@/lib/road-temperature";
 import { GateStatus, OverallAccessRisk, RoadStatus } from "@/lib/types";
 
 function formatDateTime(value?: string | null) {
@@ -92,12 +94,24 @@ function healthTone(value: "current" | "aging" | "stale" | "failed" | "never" | 
   }
 }
 
+function getTemperatureRangeLabel(range: TemperatureRange) {
+  switch (range) {
+    case "day":
+      return "Daily";
+    case "month":
+      return "Monthly";
+    case "week":
+    default:
+      return "7 day";
+  }
+}
+
 export default async function RoadPage({
   params,
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; tempRange?: string }>;
 }) {
   const { projectId } = await params;
   const query = await searchParams;
@@ -131,7 +145,9 @@ export default async function RoadPage({
   }
 
   const { corridor, currentStatus, activeAlerts, latestSnapshot } = overview;
-  const [recentEvents, recentSnapshots, sourceHealth, roadReports, fieldPoints, photos, lidarScans, culverts, roadMeasurements, measurementStats] = await Promise.all([
+  const selectedTemperatureRange: TemperatureRange =
+    query.tempRange === "day" || query.tempRange === "month" || query.tempRange === "week" ? query.tempRange : "week";
+  const [recentEvents, recentSnapshots, sourceHealth, roadReports, fieldPoints, photos, lidarScans, culverts, roadMeasurements, measurementStats, temperatureSeries] = await Promise.all([
     getRecentRoadStatusEvents(corridor.id, 6),
     getRecentRoadDailySnapshots(corridor.id, 10),
     getRoadSourceHealth(corridor.id),
@@ -141,7 +157,8 @@ export default async function RoadPage({
     getLidarScansByProjectSlug(projectId),
     getCulvertsByProjectId(project.id),
     getRoadFieldMeasurementsByCorridorId(corridor.id, 12),
-    getRoadMeasurementStats(corridor.id)
+    getRoadMeasurementStats(corridor.id),
+    getRoadTemperatureSeries(corridor.id, selectedTemperatureRange)
   ]);
 
   const canRefresh = role === "owner" || role === "audit";
@@ -155,10 +172,19 @@ export default async function RoadPage({
   const roadFieldPoints = fieldPoints.filter((point) => roadPointTypes.has(point.point_type));
   const fieldPointMap = new Map(fieldPoints.map((point) => [point.id, point]));
   const lidarScanMap = new Map(lidarScans.map((scan) => [scan.id, scan]));
+  const buildTemperatureRangeHref = (range: TemperatureRange) => {
+    const params = new URLSearchParams();
+
+    if (query.status) params.set("status", query.status);
+    if (query.error) params.set("error", query.error);
+    params.set("tempRange", range);
+
+    return `/projects/${projectId}/road?${params.toString()}`;
+  };
 
   const feedbackText: Record<string, string> = {
     "weather-refreshed": "NWS weather observations, forecasts, and active alerts were refreshed.",
-    "status-refreshed": "USFS and RRMMC road-status sources were refreshed.",
+    "status-refreshed": "USFS, RRMMC, and any enabled community road sources were refreshed.",
     recalculated: "The deterministic reconciliation engine recalculated consolidated road status and logged a status event.",
     "snapshot-generated": "A daily road snapshot was generated from the current reconciled status and weather evidence.",
     "report-saved": "Road condition report saved. It is marked as a user observation until explicitly verified.",
@@ -719,6 +745,33 @@ export default async function RoadPage({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-ink">Temperature trend</h2>
+                <p className="mt-2 text-sm text-slate-600">Average corridor temperatures from active road weather sampling sites.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(["day", "week", "month"] as TemperatureRange[]).map((range) => (
+                  <Link
+                    key={range}
+                    href={buildTemperatureRangeHref(range)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      selectedTemperatureRange === range
+                        ? "bg-pine text-white shadow-sm"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {getTemperatureRangeLabel(range)}
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="mt-5">
+              <TemperatureTrendChart points={temperatureSeries} range={selectedTemperatureRange} />
             </div>
           </div>
 
